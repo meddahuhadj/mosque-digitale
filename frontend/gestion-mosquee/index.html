@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a6b4a" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <title>Gestion Mosquee</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Login Screen -->
+    <div id="screen-login" class="screen active">
+      <div class="login-card">
+        <div class="bismillah">&#1576;&#1616;&#1587;&#1618;&#1605;&#1616; &#1575;&#1604;&#1604;&#1617;&#1607;&#1616; &#1575;&#1604;&#1585;&#1617;&#1614;&#1581;&#1618;&#1605;&#1614;&#1606;&#1616; &#1575;&#1604;&#1585;&#1617;&#1614;&#1581;&#1616;&#1610;&#1605;&#1616;</div>
+        <h1>Gestion Mosquee</h1>
+        <p class="subtitle">Connectez-vous pour gerer votre mosquee</p>
+        <form id="login-form">
+          <input type="text" id="login-username" placeholder="Nom d'utilisateur" required />
+          <input type="password" id="login-password" placeholder="Mot de passe" required />
+          <button type="submit" class="btn btn-primary">Se connecter</button>
+          <button type="button" class="btn btn-link" id="btn-register-link">Creer un compte</button>
+          <div id="login-error" class="error"></div>
+        </form>
+        <form id="register-form" style="display:none">
+          <input type="text" id="reg-fullname" placeholder="Nom complet" />
+          <input type="text" id="reg-username" placeholder="Nom d'utilisateur" required />
+          <input type="password" id="reg-password" placeholder="Mot de passe" required />
+          <button type="submit" class="btn btn-primary">Creer le compte</button>
+          <button type="button" class="btn btn-link" id="btn-login-link">Deja un compte ?</button>
+          <div id="register-error" class="error"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="screen-main" class="screen" style="display:none">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <h2 id="page-title">Tableau de bord</h2>
+        <div class="topbar-actions">
+          <span id="user-display"></span>
+          <button class="btn-icon" id="btn-logout" title="Deconnexion">&#x2190;</button>
+        </div>
+      </header>
+
+      <!-- Bottom Nav -->
+      <nav class="bottom-nav">
+        <button class="nav-btn active" data-page="dashboard">
+          <span class="nav-icon">&#9776;</span>
+          <span class="nav-label">Accueil</span>
+        </button>
+        <button class="nav-btn" data-page="prayers">
+          <span class="nav-icon">&#9790;</span>
+          <span class="nav-label">Prieres</span>
+        </button>
+        <button class="nav-btn" data-page="announcements">
+          <span class="nav-icon">&#9998;</span>
+          <span class="nav-label">Annonces</span>
+        </button>
+        <button class="nav-btn" data-page="finances">
+          <span class="nav-icon">&#9878;</span>
+          <span class="nav-label">Finances</span>
+        </button>
+        <button class="nav-btn" data-page="events">
+          <span class="nav-icon">&#9788;</span>
+          <span class="nav-label">Evenements</span>
+        </button>
+        <button class="nav-btn" data-page="members">
+          <span class="nav-icon">&#9823;</span>
+          <span class="nav-label">Membres</span>
+        </button>
+      </nav>
+
+      <!-- Page Content -->
+      <main class="content">
+        <!-- Dashboard -->
+        <section id="page-dashboard" class="page active">
+          <div class="stats-grid" id="stats-grid"></div>
+          <h3>Prieres du jour</h3>
+          <div id="dashboard-prayers"></div>
+          <h3>Derniere annonce</h3>
+          <div id="dashboard-announcements"></div>
+        </section>
+
+        <!-- Prayers -->
+        <section id="page-prayers" class="page">
+          <div class="page-header">
+            <h3>Horaires de prieres</h3>
+            <button class="btn btn-primary btn-sm" id="btn-add-prayer">+ Ajouter</button>
+          </div>
+          <div id="prayers-list"></div>
+          <div id="prayer-form" class="modal" style="display:none">
+            <div class="modal-content">
+              <h3 id="prayer-form-title">Ajouter une priere</h3>
+              <form>
+                <label>Nom</label>
+                <select id="p-name">
+                  <option>Fajr</option><option>Dhuhr</option><option>Asr</option><option>Maghrib</option><option>Isha</option>
+                </select>
+                <label>Heure (HH:MM)</label>
+                <div class="time-inputs">
+                  <input type="number" id="p-hour" min="0" max="23" placeholder="Heure" required />
+                  <input type="number" id="p-minute" min="0" max="59" placeholder="Minute" required />
+                </div>
+                <label>Iqama (HH:MM)</label>
+                <div class="time-inputs">
+                  <input type="number" id="p-iqama-hour" min="0" max="23" placeholder="Heure" />
+                  <input type="number" id="p-iqama-minute" min="0" max="59" placeholder="Minute" />
+                </div>
+                <input type="hidden" id="p-edit-id" />
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">Enregistrer</button>
+                  <button type="button" class="btn btn-secondary" id="btn-cancel-prayer">Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- Announcements -->
+        <section id="page-announcements" class="page">
+          <div class="page-header">
+            <h3>Annonces</h3>
+            <button class="btn btn-primary btn-sm" id="btn-add-announcement">+ Nouvelle</button>
+          </div>
+          <div id="announcements-list"></div>
+          <div id="announcement-form" class="modal" style="display:none">
+            <div class="modal-content">
+              <h3 id="ann-form-title">Nouvelle annonce</h3>
+              <form>
+                <input type="text" id="a-title" placeholder="Titre" required />
+                <textarea id="a-content" placeholder="Contenu..." rows="4" required></textarea>
+                <label>Categorie</label>
+                <select id="a-category">
+                  <option value="general">General</option>
+                  <option value="urgence">Urgence</option>
+                  <option value="religieux">Religieux</option>
+                  <option value="social">Social</option>
+                </select>
+                <input type="hidden" id="a-edit-id" />
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">Publier</button>
+                  <button type="button" class="btn btn-secondary" id="btn-cancel-ann">Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- Finances -->
+        <section id="page-finances" class="page">
+          <div class="page-header">
+            <h3>Finances</h3>
+            <button class="btn btn-primary btn-sm" id="btn-add-finance">+ Transaction</button>
+          </div>
+          <div id="finance-summary" class="stats-grid"></div>
+          <div id="finances-list"></div>
+          <div id="finance-form" class="modal" style="display:none">
+            <div class="modal-content">
+              <h3>Ajouter une transaction</h3>
+              <form>
+                <label>Type</label>
+                <select id="f-type">
+                  <option value="recette">Recette</option>
+                  <option value="depense">Depense</option>
+                </select>
+                <input type="text" id="f-category" placeholder="Categorie (ex: don, electricite...)" required />
+                <input type="text" id="f-description" placeholder="Description (optionnel)" />
+                <input type="number" id="f-amount" step="0.01" min="0" placeholder="Montant (MAD)" required />
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">Enregistrer</button>
+                  <button type="button" class="btn btn-secondary" id="btn-cancel-finance">Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- Events -->
+        <section id="page-events" class="page">
+          <div class="page-header">
+            <h3>Evenements</h3>
+            <button class="btn btn-primary btn-sm" id="btn-add-event">+ Evenement</button>
+          </div>
+          <div id="events-list"></div>
+          <div id="event-form" class="modal" style="display:none">
+            <div class="modal-content">
+              <h3 id="ev-form-title">Nouvel evenement</h3>
+              <form>
+                <input type="text" id="e-title" placeholder="Titre" required />
+                <textarea id="e-description" placeholder="Description..." rows="3"></textarea>
+                <input type="text" id="e-location" placeholder="Lieu" />
+                <label>Date/heure debut</label>
+                <input type="datetime-local" id="e-start" required />
+                <label>Date/heure fin</label>
+                <input type="datetime-local" id="e-end" />
+                <input type="number" id="e-max" min="0" placeholder="Places max (optionnel)" />
+                <input type="hidden" id="e-edit-id" />
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">Enregistrer</button>
+                  <button type="button" class="btn btn-secondary" id="btn-cancel-event">Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- Members -->
+        <section id="page-members" class="page">
+          <div class="page-header">
+            <h3>Membres</h3>
+            <button class="btn btn-primary btn-sm" id="btn-add-member">+ Membre</button>
+          </div>
+          <div id="members-list"></div>
+          <div id="member-form" class="modal" style="display:none">
+            <div class="modal-content">
+              <h3 id="m-form-title">Ajouter un membre</h3>
+              <form>
+                <input type="text" id="m-name" placeholder="Nom complet" required />
+                <input type="email" id="m-email" placeholder="Email (optionnel)" />
+                <input type="tel" id="m-phone" placeholder="Telephone (optionnel)" />
+                <label>Role</label>
+                <select id="m-role">
+                  <option value="fidele">Fidele</option>
+                  <option value="benevole">Benevole</option>
+                  <option value="imam">Imam</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <input type="hidden" id="m-edit-id" />
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">Enregistrer</button>
+                  <button type="button" class="btn btn-secondary" id="btn-cancel-member">Annuler</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

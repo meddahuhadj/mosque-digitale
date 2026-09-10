@@ -32,10 +32,12 @@ class FakeHttp:
     """Client factice : route .post() selon l'URL, via des handlers fournis par le test."""
     def __init__(self, handlers):
         self.handlers = handlers          # liste de (motif_url, fonction(url,kw)->_Resp)
-        self.calls = []
+        self.calls = []                   # URL appelées (rétro-compat)
+        self.posts = []                   # (url, kwargs) pour inspection fine
 
     async def post(self, url, **kw):
         self.calls.append(url)
+        self.posts.append((url, kw))
         for needle, fn in self.handlers:
             if needle in url:
                 return fn(url, kw)
@@ -176,3 +178,98 @@ async def test_stt_prefers_groq_then_gemini(monkeypatch):
 
 def _gemini_ok_text(t):
     return _Resp(200, {"candidates": [{"content": {"parts": [{"text": t}]}}]})
+
+
+# --------------------------- Résumé de session --------------------------- #
+
+_TRANSCRIPT = [
+    {"arabic": "الحمد لله رب العالمين", "ts": 1700000000000,
+     "is_quran": True, "quran_ref": "1:2"},
+    {"arabic": "قال رسول الله صلى الله عليه وسلم", "ts": 1700000060000,
+     "is_hadith": True},
+    {"arabic": "فاصبر صبرا جميلا", "ts": 1700000120000},
+]
+
+
+async def test_summarize_gemini_success(monkeypatch):
+    obj = {"sujet": "La patience", "langue": "fr",
+           "points_principaux": ["La patience dans l'épreuve"],
+           "versets": ["Sourate 1:2"], "hadiths": [],
+           "a_retentir": ["Invoquer Allah"], "avertissements": []}
+    _use(monkeypatch, ("generativelanguage", lambda u, k: _gemini_ok(obj)))
+    r = await translator.summarize_session(_TRANSCRIPT, lang="fr")
+    assert r["sujet"] == "La patience"
+    assert r["versets"] == ["Sourate 1:2"]
+    assert r["duree_min"] == 2, "durée déduite des horodatages (120 s -> 2 min)"
+
+
+async def test_summarize_falls_back_to_groq_on_gemini_quota(monkeypatch):
+    monkeypatch.setattr(translator, "GROQ_KEY", "grq")
+    obj = {"sujet": "La crainte d'Allah", "langue": "nl",
+           "points_principaux": ["Taqwa au quotidien"],
+           "versets": [], "hadiths": [], "a_retentir": [], "avertissements": []}
+    fake = _use(monkeypatch,
+                ("generativelanguage", lambda u, k: _Resp(429, {}, "q")),
+                ("groq.com", lambda u, k: _openai_ok(obj)))
+    r = await translator.summarize_session(_TRANSCRIPT, lang="nl")
+    assert r["langue"] == "nl" and r["sujet"] == "La crainte d'Allah"
+    assert translator.last_provider() == "groq"
+    assert any("groq.com" in c for c in fake.calls)
+
+
+async def test_summarize_normalizes_and_computes_duration(monkeypatch):
+    obj = {"sujet": "X", "langue": "fr", "duree_min": 0,
+           "points_principaux": ["a", "", None],
+           "versets": None, "hadiths": "", "a_retentir": [], "avertissements": []}
+    _use(monkeypatch, ("generativelanguage", lambda u, k: _gemini_ok(obj)))
+    r = await translator.summarize_session(_TRANSCRIPT)
+    assert r["points_principaux"] == ["a"]
+    assert r["versets"] == [] and r["hadiths"] == []
+    assert r["duree_min"] == 2
+
+
+async def test_summarize_no_content(monkeypatch):
+    assert await translator.summarize_session([]) is None
+    assert translator.last_error() == "no_content"
+
+
+async def test_summarize_uses_last_segments_when_too_long(monkeypatch):
+    obj = {"sujet": "Long", "langue": "fr", "points_principaux": ["b"],
+           "versets": [], "hadiths": [], "a_retentir": [], "avertissements": []}
+    fake = _use(monkeypatch, ("generativelanguage", lambda u, k: _gemini_ok(obj)))
+    lst = [{"arabic": f"phrase {i:03d}"} for i in range(300)]
+    r = await translator.summarize_session(lst)
+    assert r["sujet"] == "Long"
+    body = fake.posts[0][1]["json"]
+    user = body["contents"][0]["parts"][0]["text"]
+    assert "phrase 050" in user and "phrase 000" not in user, "seule la fin de session est résumée"
+
+
+async def test_ask_question_gemini(monkeypatch):
+    obj = {"answer": "La patience en deux mots.", "references": ["≈ Sourate 2:153"]}
+    fake = _use(monkeypatch, ("generativelanguage", lambda u, k: _gemini_ok(obj)))
+    r = await translator.ask_question("Parle-moi de la patience",
+                                      _TRANSCRIPT, lang="fr")
+    assert r["answer"].startswith("La patience")
+    assert r["references"] == ["≈ Sourate 2:153"]
+    body = fake.posts[0][1]["json"]
+    user = body["contents"][0]["parts"][0]["text"]
+    assert "LANGUE de la réponse : fr" in user
+    assert "QUESTION posée par un fidèle" in user
+
+
+async def test_ask_question_falls_back_to_groq(monkeypatch):
+    monkeypatch.setattr(translator, "GROQ_KEY", "grq")
+    obj = {"answer": "Antwoord in het Nederlands.", "references": []}
+    fake = _use(monkeypatch,
+                ("generativelanguage", lambda u, k: _Resp(429, {}, "q")),
+                ("groq.com", lambda u, k: _openai_ok(obj)))
+    r = await translator.ask_question("Vraag", _TRANSCRIPT, lang="nl")
+    assert r["answer"].startswith("Antwoord")
+    assert translator.last_provider() == "groq"
+    assert any("groq.com" in c for c in fake.calls)
+
+
+async def test_ask_question_empty(monkeypatch):
+    assert await translator.ask_question("", _TRANSCRIPT) is None
+    assert translator.last_error() == "no_question"

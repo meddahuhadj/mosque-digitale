@@ -1,0 +1,48 @@
+{
+    # Local development with auto HTTPS via Caddy's internal CA
+    local_certs
+    auto_https off
+}
+
+localhost {
+    # Trust the internal CA for localhost
+    tls internal
+
+    # Reverse proxy to backend
+    reverse_proxy backend:8000 {
+        # WebSocket support
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        
+        # Long timeouts for WebSocket
+        transport http {
+            read_timeout 3600s
+            write_timeout 3600s
+        }
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "microphone=(), camera=()"
+    }
+
+    # Gzip compression
+    encode gzip zstd
+
+    # Health check endpoint
+    @healthz path /healthz
+    handle @healthz {
+        reverse_proxy backend:8000
+    }
+}
+
+# For LAN access with IP - generate cert with: mkcert 192.168.x.x
+# 192.168.x.x {
+#     tls /certs/192.168.x.x.pem /certs/192.168.x.x-key.pem
+#     reverse_proxy backend:8000 { ... }
+# }

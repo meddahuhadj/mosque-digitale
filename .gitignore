@@ -1,12 +1,18 @@
 # Env
 backend/.env
 backend/.venv/
+server/.env
 **/__pycache__/
 *.pyc
 
+# Node
+node_modules/
+server/node_modules/
+server/dist/
+server/logs/
+
 # Plateforme
 .vercel/
-node_modules/
 
 # OS / éditeur
 .DS_Store
@@ -14,6 +20,9 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
 # Tests
 .pytest_cache/
 backend/data/quran_raw.json
+
+.vercel

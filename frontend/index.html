@@ -286,6 +286,10 @@
   #liveLine{position:sticky; bottom:0; background:linear-gradient(180deg,transparent,var(--bg) 45%);
     padding:12px 6px calc(14px + env(safe-area-inset-bottom));
     font-family:"Noto Naskh Arabic","Noto Sans Arabic",serif; color:var(--muted); min-height:2.4em}
+  #aiNote{position:sticky; bottom:0; z-index:5; font-size:.66rem; line-height:1.35;
+    text-align:center; padding:4px 10px calc(6px + env(safe-area-inset-bottom));
+    color:var(--muted); opacity:.85; background:linear-gradient(0deg,var(--bg) 60%,transparent)}
+  #aiNote.hidden{display:none}
   @keyframes fade{from{opacity:0; transform:translateY(6px)}to{opacity:1}}
   @media (prefers-reduced-motion: reduce){*{animation:none !important; transition:none !important}}
   .sheet{position:fixed; inset:0; background:var(--scrim); display:flex; align-items:flex-end;
@@ -376,8 +380,26 @@
   .prayer-settings[open] summary{margin-bottom:10px}
   .prayer-flex{display:flex; align-items:center; gap:8px; margin-top:8px}
 
+  /* --- Qibla / mode arrivée --- */
+  .compass{position:relative; width:min(78vw, 300px); aspect-ratio:1; margin:12px auto}
+  .compass-ring{position:absolute; inset:0; border-radius:50%; background:var(--card2);
+    border:2px solid var(--line); box-shadow:var(--shadow)}
+  .compass-ring::before{content:"▲"; position:absolute; left:50%; top:2px; transform:translateX(-50%);
+    color:var(--accent3); font-size:.8rem}
+  .cp{position:absolute; font-size:.72rem; color:var(--muted); font-weight:600}
+  .cp-n{left:50%; top:28px; transform:translateX(-50%)}
+  .cp-s{left:50%; bottom:20px; transform:translateX(-50%)}
+  .cp-e{top:50%; right:22px; transform:translateY(-50%)}
+  .cp-w{top:50%; left:22px; transform:translateY(-50%)}
+  .cp-kaaba{position:absolute; left:50%; top:50%; font-size:2rem; line-height:1;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}
+  .compass-core{position:absolute; inset:48px; border-radius:50%; background:var(--card);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px}
+  .qibla-bearing{font-size:1.9rem; font-weight:800; line-height:1}
+  .qibla-label{font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em}
+
   /* --- Mode simple : un seul très gros sous-titre, aucun réglage --- */
-  body.simple .topbar, body.simple #liveLine, body.simple .bismillah{display:none}
+  body.simple .topbar, body.simple #liveLine, body.simple #aiNote, body.simple .bismillah{display:none}
   body.simple #btnSimpleExit{display:block; background:var(--card); box-shadow:var(--shadow)}
   body.simple #subs{padding:8px 4px 22vh; display:flex; flex-direction:column; justify-content:flex-end}
   body.simple .sub{display:none}
@@ -514,6 +536,8 @@
       <button class="big ghost" id="btnQuranHome" style="margin-top:10px" data-i18n="home_quran">📖 Écouter le Coran (récitation)</button>
       <button class="big ghost" id="btnTasbihHome" style="margin-top:8px" data-i18n="home_tasbih">📿 Tasbih — compteur de dhikr</button>
       <button class="big ghost" id="btnPrayerHome" style="margin-top:8px" data-i18n="home_prayer">🕌 Heures de prière</button>
+      <button class="big ghost" id="btnArrivalHome" style="margin-top:8px" data-i18n="arrival_h">🕌 Mode arrivée — Qibla</button>
+      <button class="big ghost" id="btnAskHome" style="margin-top:8px" data-i18n="ask_h">🙋 Ask My Mosque</button>
       <p class="prayer-next" id="prayerNextHome"></p>
       <p class="dhikr" id="dhikrHome"></p>
       <div class="ornate-divider"><span>☪</span></div>
@@ -522,6 +546,46 @@
     <p class="center" style="margin-top:8px">
       <button class="ghost" id="btnPrivacy" type="button" style="padding:8px 14px; font-size:.8rem" data-i18n="privacy_link">🔒 Confidentialité</button>
     </p>
+  </section>
+
+  <!-- ====================== QIBLA — MODE ARRIVÉE ====================== -->
+  <section id="screen-arrival" class="hidden">
+    <div class="card center islamic-pattern" style="min-height:100%">
+      <div class="islamic-ornament">✦ ✦ ✦</div>
+      <p class="home-salam" data-i18n="home_salam">As-salâmu ʿalaykum wa raḥmatu Llâh</p>
+      <p class="hijri-date hidden" id="arrivalDate"></p>
+      <h2 data-i18n="arrival_h">🕌 Mode arrivée — Qibla</h2>
+      <p class="muted" data-i18n="arrival_p" style="margin-bottom:6px">En attendant le prêche, orientez-vous vers la Qibla. La traduction en direct est disponible dès le début.</p>
+
+      <div class="compass" id="compass" aria-hidden="true">
+        <div class="compass-ring">
+          <span class="cp cp-n" data-dir="n">N</span>
+          <span class="cp cp-e" data-dir="e">E</span>
+          <span class="cp cp-s" data-dir="s">S</span>
+          <span class="cp cp-w" data-dir="w">W</span>
+          <span class="cp-kaaba" id="compass-kaaba">🕋</span>
+          <div class="compass-core">
+            <div class="qibla-bearing" id="qibla-bearing">—</div>
+            <div class="qibla-label" id="qibla-blabel" data-i18n="qibla_bearing">Qibla — cap depuis le nord</div>
+          </div>
+        </div>
+      </div>
+      <p class="muted" id="qibla-status" style="font-size:.78rem; margin:8px auto 0; max-width:460px"></p>
+      <div class="row" style="margin-top:8px">
+        <button class="ghost" id="btnQiblaManual" style="padding:8px 14px; font-size:.82rem" data-i18n="qibla_manual">Orienter manuellement</button>
+        <button class="ghost" id="btnQiblaRecal" style="padding:8px 14px; font-size:.82rem" data-i18n="qibla_recal">Recaler la position</button>
+      </div>
+      <div class="hidden" id="qibla-manualBox" style="margin-top:6px; max-width:460px; margin-left:auto; margin-right:auto">
+        <div class="row">
+          <input id="qibla-manual" type="range" min="0" max="359" value="0" step="1" style="flex:1" />
+          <span class="muted" id="qibla-manualDeg" style="width:52px; text-align:right">0°</span>
+        </div>
+      </div>
+      <div class="row" style="margin-top:18px">
+        <button class="big" id="btnArrivalJoin" data-i18n="home_listen">J'écoute (fidèle)</button>
+        <button class="big ghost" id="btnArrivalHome" data-i18n="back_home">Accueil</button>
+      </div>
+    </div>
   </section>
 
   <!-- ====================== LECTEUR CORAN (récitation) ====================== -->
@@ -737,6 +801,27 @@
             <button class="ghost" id="btnCorrectCancel" data-i18n="close">Annuler</button>
           </div>
         </div>
+        <div class="row" style="margin-top:10px">
+          <button class="ghost" id="btnBcExportPrint" style="flex:0 0 auto; padding:8px 14px; font-size:.82rem" data-i18n="hist_print">Imprimer / PDF</button>
+          <button class="ghost" id="btnBcExportTxt" style="flex:0 0 auto; padding:8px 14px; font-size:.82rem" data-i18n="hist_txt">Télécharger .txt</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="secondary" id="btnBcStats" style="flex:0 0 auto; padding:10px 16px" data-i18n="st_live">📊 Live</button>
+          <button class="secondary" id="btnBcReport" style="flex:0 0 auto; padding:10px 16px" data-i18n="bc_report">📋 Rapport de fin de khutbah</button>
+        </div>
+        <div id="bc-statsPanel" class="hidden" style="margin-top:12px">
+          <div class="row" style="gap:6px; flex-wrap:wrap">
+            <span class="pill"><b id="st-now">0</b>&nbsp;<span data-i18n="st_listens">auditeurs</span></span>
+            <span class="pill">▲&nbsp;<b id="st-peak">0</b>&nbsp;<span data-i18n="st_peak">au plus fort</span></span>
+            <span class="pill">👥&nbsp;<b id="st-joins">0</b>&nbsp;<span data-i18n="st_joins">rejoints</span></span>
+            <span class="pill">⏱&nbsp;<b id="st-min">0′</b>&nbsp;<span data-i18n="st_dur">durée</span></span>
+            <span class="pill">#<b id="st-seg">0</b>&nbsp;<span data-i18n="st_seg">segments</span></span>
+          </div>
+          <div id="bc-statsHist" style="display:flex; align-items:flex-end; gap:2px; height:54px; margin-top:10px"></div>
+          <div id="bc-statsLangs" style="margin-top:6px"></div>
+          <p class="muted" style="font-size:.72rem; margin:6px 0 0" data-i18n="st_live_hint">Échantillon d'auditeurs toutes les 5 s pendant la diffusion — rafraîchi automatiquement.</p>
+        </div>
+        <p class="muted" style="font-size:.7rem; margin:8px 0 0" data-i18n="ai_note"></p>
       </div>
 
       <div class="card">
@@ -785,6 +870,7 @@
       <span class="pill" role="status" aria-live="polite"><span class="dot" id="ls-connDot" aria-hidden="true"></span><span id="ls-connTxt">…</span></span>
       <span class="pill hidden" id="ls-mosque" style="max-width:45vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></span>
       <div class="row" style="flex:0; gap:6px">
+        <button class="ghost" id="btnAskTop" style="padding:8px 12px" data-i18n-aria="ask_h" aria-label="Ask My Mosque">🙋</button>
         <button class="ghost" id="btnHistory" style="padding:8px 12px" data-i18n="ls_history">Historique</button>
         <button class="ghost" id="btnSettings" style="padding:8px 12px" data-i18n-aria="set_h" aria-label="Réglages">⚙</button>
       </div>
@@ -794,6 +880,7 @@
     <div id="subs" role="log" aria-live="polite" aria-atomic="false" aria-relevant="additions"
          data-i18n-aria="a11y_subs" aria-label="Traduction en direct"></div>
     <div id="liveLine" dir="rtl" aria-hidden="true"></div>
+    <div id="aiNote" class="ai-note" aria-hidden="true" data-i18n="ai_note"></div>
 
     <!-- feuille réglages -->
     <div id="sheet-settings" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheet-settings-h">
@@ -820,6 +907,10 @@
         <div class="switch">
           <span data-i18n="set_simple">Mode simple (très gros texte)</span>
           <input type="checkbox" id="set-simple" />
+        </div>
+        <div class="switch">
+          <span data-i18n="set_ai_note">Afficher l'avertissement IA</span>
+          <input type="checkbox" id="set-ai-note" checked />
         </div>
         <div class="switch">
           <span data-i18n="set_contrast">Contraste élevé</span>
@@ -852,6 +943,42 @@
       <h2 id="sheet-privacy-h" data-i18n="privacy_h">Confidentialité & données</h2>
       <div id="privacy-body" style="font-size:.9rem; line-height:1.6"></div>
       <button class="big" id="btnClosePrivacy" style="margin-top:14px" data-i18n="close">Fermer</button>
+    </div>
+  </div>
+
+  <!-- ====================== RAPPORT DE SESSION (IA) ====================== -->
+  <div id="sheet-report" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheet-report-h">
+    <div class="inner">
+      <h2 id="sheet-report-h" data-i18n="report_h">Rapport de la session</h2>
+      <p class="muted" style="font-size:.75rem; margin:0 0 6px" data-i18n="report_disclaimer">Rapport généré par IA — sujet, références et points à vérifier par l'imam.</p>
+      <div id="report-meta" class="muted" style="font-size:.78rem; margin-bottom:8px"></div>
+      <div id="report-sections"></div>
+      <div id="report-status" class="hidden" style="margin-top:8px; font-size:.9rem"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="secondary" id="btnReportPrint" data-i18n="hist_print">Imprimer / PDF</button>
+        <button class="secondary" id="btnReportTxt" data-i18n="hist_txt">Télécharger .txt</button>
+      </div>
+      <button class="big" id="btnCloseReport" style="margin-top:14px" data-i18n="close">Fermer</button>
+    </div>
+  </div>
+
+  <!-- ====================== ASK MY MOSQUE (question IA) ====================== -->
+  <div id="sheet-ask" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheet-ask-h">
+    <div class="inner">
+      <h2 id="sheet-ask-h" data-i18n="ask_h">🙋 Ask My Mosque — posez une question</h2>
+      <p class="muted" style="font-size:.75rem; margin:0 0 8px" data-i18n="ask_p">Réponse générée par IA, ancrée sur la khutbah en cours — à vérifier par l'imam.</p>
+      <textarea id="ask-q" rows="3" dir="auto" placeholder="…"
+        data-i18n-aria="ask_ph" aria-label="Votre question"
+        style="width:100%; padding:10px; border-radius:12px; background:var(--card2); color:var(--fg); border:1px solid var(--line); resize:vertical"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="secondary" id="btnAskSend" data-i18n="ask_send">Envoyer</button>
+      </div>
+      <div id="ask-status" class="hidden" style="margin-top:10px; font-size:.9rem"></div>
+      <div id="ask-ans" class="hidden" style="margin-top:12px; line-height:1.55">
+        <div id="ask-ans-text" dir="auto"></div>
+        <div id="ask-refs" class="muted" style="font-size:.8rem; margin-top:8px"></div>
+      </div>
+      <button class="big" id="btnCloseAsk" style="margin-top:14px" data-i18n="close">Fermer</button>
     </div>
   </div>
 
@@ -986,6 +1113,15 @@ Object.assign(I18N.fr,{bc_mosque:"Nom de la mosquée (affiché aux fidèles)",bc
   bc_correct:"✏️ Corriger ce segment",bc_correct_send:"Renvoyer corrigé",
   join_simple:"Mode simple (très gros texte, sans réglages)",simple_exit:"✕ réglages",set_simple:"Mode simple (très gros texte)",
   hist_print:"Imprimer / PDF",hist_txt:"Télécharger .txt",
+  bc_report:"📋 Rapport de fin de khutbah",report_h:"Rapport de la session",
+  report_disclaimer:"Rapport généré par IA — sujet, références et points à vérifier par l'imam.",
+  report_loading:"Génération du rapport…",report_err:"Rapport indisponible",
+  report_none:"Pas encore assez de phrases pour un rapport (2 minimum).",
+  report_segments:"segments",report_subject:"Sujet",report_duration:"Durée",
+  report_verses:"Versets cités",report_hadiths:"Hadiths cités",
+  report_points:"Points principaux",report_takeaway:"À retenir",report_warnings:"Avertissements",
+  ai_note:"Traductions et références générées par IA — sujet et références à vérifier par l'imam.",
+  set_ai_note:"Afficher l'avertissement IA",
   resumed_toast:"Reconnecté — {n} phrase(s) récupérée(s)",corrected_toast:"Segment corrigé",
   ios_note:"Sur iPhone/iPad, la reconnaissance vocale du navigateur n'existe pas : utilisez « Audio → serveur » ou « Manuel ».",
   export_title:"Khutbah",export_none:"Rien à exporter pour l'instant.",
@@ -1000,7 +1136,26 @@ Object.assign(I18N.fr,{bc_mosque:"Nom de la mosquée (affiché aux fidèles)",bc
   quran_status_playing:"Récitation en cours : {s}",
   home_tasbih:"📿 Tasbih — compteur de dhikr",
   tasbih_h:"Tasbih — dhikr",tasbih_reset:"Recommencer",
-  tasbih_hint:"Après la prière : 33 fois Subḥān Allāh, 33 fois Al-ḥamdu li-Llāh, 33 fois Allāhu akbar, puis la formule du tahlîl (34 fois)."});
+  tasbih_hint:"Après la prière : 33 fois Subḥān Allāh, 33 fois Al-ḥamdu li-Llāh, 33 fois Allāhu akbar, puis la formule du tahlîl (34 fois).",
+  arrival_h:"🕌 Mode arrivée — Qibla",arrival_p:"En attendant le prêche, orientez-vous vers la Qibla. La traduction en direct est disponible dès le début.",
+  back_home:"Accueil",
+  qibla_bearing:"Qibla — cap depuis le nord",qibla_manual:"Orienter manuellement",qibla_recal:"Recaler la position",
+  qibla_n:"N",qibla_e:"E",qibla_s:"S",qibla_w:"O",
+  qibla_status_gps:"Position GPS détectée",
+  qibla_status_gps_ok:"Position GPS — capteur actif. Alignez le 🕋 avec la pointe.",
+  qibla_status_gps_search:"Localisation en cours…",
+  qibla_status_gps_denied:"Localisation refusée — utilisez le mode manuel.",
+  qibla_status_manual:"Mode manuel — tournez le curseur jusqu'à placer le 🕋 au sommet du cadran.",
+  qibla_status_off:"Capteur de boussole indisponible — utilisez le mode manuel.",
+  qibla_status_pos_missing:"Position inconnue — autorisez la localisation ou utilisez le mode manuel.",
+  ask_h:"🙋 Ask My Mosque — posez une question",
+  ask_p:"Réponse générée par IA, ancrée sur la khutbah en cours — à vérifier par l'imam.",
+  ask_ph:"Votre question…",ask_send:"Envoyer",ask_loading:"Réflexion…",
+  ask_join:"Rejoignez d'abord une session.",ask_empty:"Écrivez une question.",
+  ask_err:"Réponse indisponible.",ask_refs:"Références",
+  st_live:"📊 Live",st_live_hint:"Échantillon d'auditeurs toutes les 5 s pendant la diffusion — rafraîchi automatiquement.",
+  st_listens:"auditeurs",st_peak:"pic",st_joins:"rejoints",st_dur:"durée",st_seg:"segments",
+  st_wait:"En attente d'échantillons…",st_langs_now:"Langues en ce moment"});
 
 /* --- Accessibilité & confidentialité (v1.4) --- */
 Object.assign(I18N.fr,{
@@ -1107,6 +1262,7 @@ Object.assign(I18N.fr,{
   sr_st_wait:"Écoute active — parlez pour diffuser…", sr_st_ok:"Voix captée — diffusion en cours",
   sr_st_manual:"Mode manuel : tapez ou utilisez la bibliothèque de phrases.",
   sr_st_paused:"En pause.", sr_st_nospeech:"Aucune parole détectée.",
+  sr_vad_off:"Détection des pauses indisponible — envoi en tranches de 4 s.",
   sr_network:"La reconnaissance vocale a besoin d'Internet et n'y arrive pas. Passez en « Audio → serveur » ou « Manuel ».",
   sr_lang:"Cette langue n'est pas prise en charge par la reconnaissance du navigateur. Essayez une autre variante, « Audio → serveur » ou « Manuel ».",
   sr_error:"Erreur de reconnaissance vocale", sr_startfail:"Impossible de démarrer la reconnaissance vocale. Utilisez « Audio → serveur » ou « Manuel ».",
@@ -1116,6 +1272,7 @@ Object.assign(I18N.en,{
   sr_st_wait:"Listening — speak to broadcast…", sr_st_ok:"Voice captured — broadcasting",
   sr_st_manual:"Manual mode: type or use the phrase library.",
   sr_st_paused:"Paused.", sr_st_nospeech:"No speech detected.",
+  sr_vad_off:"Pause detection unavailable — sending in 4 s slices.",
   sr_network:"Browser speech recognition needs the internet and can't reach it. Switch to “Audio → server” or “Manual”.",
   sr_lang:"This language isn't supported by browser recognition. Try another variant, “Audio → server” or “Manual”.",
   sr_error:"Speech recognition error", sr_startfail:"Could not start speech recognition. Use “Audio → server” or “Manual”.",
@@ -1125,6 +1282,7 @@ Object.assign(I18N.nl,{
   sr_st_wait:"Luisteren — spreek om uit te zenden…", sr_st_ok:"Stem opgevangen — uitzending bezig",
   sr_st_manual:"Handmatige modus: typ of gebruik de zinnenbibliotheek.",
   sr_st_paused:"Gepauzeerd.", sr_st_nospeech:"Geen spraak gedetecteerd.",
+  sr_vad_off:"Pauzeherkenning niet beschikbaar — verzenden in blokken van 4 s.",
   sr_network:"Browserspraakherkenning heeft internet nodig en kan er niet bij. Schakel naar “Audio → server” of “Handmatig”.",
   sr_lang:"Deze taal wordt niet ondersteund door browserherkenning. Probeer een andere variant, “Audio → server” of “Handmatig”.",
   sr_error:"Fout bij spraakherkenning", sr_startfail:"Kan spraakherkenning niet starten. Gebruik “Audio → server” of “Handmatig”.",
@@ -1134,6 +1292,7 @@ Object.assign(I18N.ar,{
   sr_st_wait:"جارٍ الاستماع — تكلّم للبثّ…", sr_st_ok:"تمّ التقاط الصوت — البثّ جارٍ",
   sr_st_manual:"الوضع اليدوي: اكتب أو استخدم مكتبة العبارات.",
   sr_st_paused:"متوقّف مؤقتًا.", sr_st_nospeech:"لم يُكتشف أي كلام.",
+  sr_vad_off:"كشف الوقفات غير متاح — الإرسال في مقاطع مدتها ٤ ثوانٍ.",
   sr_network:"يحتاج تعرّف الكلام في المتصفّح إلى الإنترنت ولا يصل إليه. انتقل إلى «الصوت → الخادم» أو «يدوي».",
   sr_lang:"هذه اللغة غير مدعومة في تعرّف المتصفّح. جرّب لهجة أخرى، أو «الصوت → الخادم» أو «يدوي».",
   sr_error:"خطأ في تعرّف الكلام", sr_startfail:"تعذّر بدء تعرّف الكلام. استخدم «الصوت → الخادم» أو «يدوي».",
@@ -1195,6 +1354,15 @@ Object.assign(I18N.en,{bc_mosque:"Mosque name (shown to attendees)",bc_langs:"De
   bc_correct:"✏️ Correct this segment",bc_correct_send:"Resend corrected",
   join_simple:"Simple mode (very large text, no settings)",simple_exit:"✕ settings",set_simple:"Simple mode (very large text)",
   hist_print:"Print / PDF",hist_txt:"Download .txt",
+  bc_report:"End-of-khutbah report",report_h:"Session report",
+  report_disclaimer:"AI-generated report — subject, references and points to be verified by the Imam.",
+  report_loading:"Generating report…",report_err:"Report unavailable",
+  report_none:"Not enough phrases for a report yet (2 minimum).",
+  report_segments:"segments",report_subject:"Subject",report_duration:"Duration",
+  report_verses:"Verses cited",report_hadiths:"Hadiths cited",
+  report_points:"Key points",report_takeaway:"Takeaways",report_warnings:"Warnings",
+  ai_note:"AI-generated translations and references — topic and references to be verified by the Imam.",
+  set_ai_note:"Show the AI notice",
   resumed_toast:"Reconnected — {n} sentence(s) recovered",corrected_toast:"Segment corrected",
   ios_note:"On iPhone/iPad the browser has no speech recognition: use “Audio → server” or “Manual”.",
   export_title:"Khutbah",export_none:"Nothing to export yet.",
@@ -1209,12 +1377,40 @@ Object.assign(I18N.en,{bc_mosque:"Mosque name (shown to attendees)",bc_langs:"De
   quran_status_playing:"Now reciting: {s}",
   home_tasbih:"📿 Tasbih — dhikr counter",
   tasbih_h:"Tasbih — dhikr",tasbih_reset:"Restart",
-  tasbih_hint:"After the prayer: 33 times Subhan Allah, 33 times Alhamdulillah, 33 times Allahu akbar, then the tahlil (34 times)."});
+  tasbih_hint:"After the prayer: 33 times Subhan Allah, 33 times Alhamdulillah, 33 times Allahu akbar, then the tahlil (34 times).",
+  arrival_h:"Arrival mode — Qibla",arrival_p:"While waiting for the khutbah, orient yourself toward the Qibla. Live translation is available as soon as it starts.",
+  back_home:"Home",
+  qibla_bearing:"Qibla — bearing from north",qibla_manual:"Manual orientation",qibla_recal:"Recalibrate position",
+  qibla_n:"N",qibla_e:"E",qibla_s:"S",qibla_w:"W",
+  qibla_status_gps:"GPS position detected",
+  qibla_status_gps_ok:"GPS position — sensor active. Align the 🕋 with the tip.",
+  qibla_status_gps_search:"Locating…",
+  qibla_status_gps_denied:"Location denied — use manual mode.",
+  qibla_status_manual:"Manual mode — adjust until the 🕋 sits at the top of the dial.",
+  qibla_status_off:"Compass sensor unavailable — use manual mode.",
+  qibla_status_pos_missing:"Position unknown — allow location access or use manual mode.",
+  ask_h:"🙋 Ask My Mosque — ask a question",
+  ask_p:"AI-generated answer, grounded on the current khutbah — to be verified by the Imam.",
+  ask_ph:"Your question…",ask_send:"Send",ask_loading:"Thinking…",
+  ask_join:"Join a session first.",ask_empty:"Write a question.",
+  ask_err:"Answer unavailable.",ask_refs:"References",
+  st_live:"📊 Live",st_live_hint:"Audience sampled every 5 s while broadcasting — auto-refreshed.",
+  st_listens:"listeners",st_peak:"peak",st_joins:"joined",st_dur:"duration",st_seg:"segments",
+  st_wait:"Waiting for samples…",st_langs_now:"Languages right now"});
 Object.assign(I18N.nl,{bc_mosque:"Naam van de moskee (getoond aan aanwezigen)",bc_langs:"Standaard vertaalde talen",
   bc_glossary:"Woordenlijst van de moskee (optioneel)",bc_glossary_hint:"Eigennamen, lokale termen, vereiste transliteraties. Toegevoegd aan elke vertaling.",
   bc_correct:"✏️ Dit segment corrigeren",bc_correct_send:"Gecorrigeerd opnieuw sturen",
   join_simple:"Eenvoudige modus (zeer grote tekst, geen instellingen)",simple_exit:"✕ instellingen",set_simple:"Eenvoudige modus (zeer grote tekst)",
   hist_print:"Afdrukken / PDF",hist_txt:".txt downloaden",
+  bc_report:"📋 Rapport einde khutbah",report_h:"Sessierapport",
+  report_disclaimer:"Door AI gegenereerd rapport — onderwerp, referenties en punten te verifiëren door de imam.",
+  report_loading:"Rapport wordt gegenereerd…",report_err:"Rapport niet beschikbaar",
+  report_none:"Nog niet genoeg zinnen voor een rapport (minimum 2).",
+  report_segments:"segmenten",report_subject:"Onderwerp",report_duration:"Duur",
+  report_verses:"Geciteerde verzen",report_hadiths:"Geciteerde hadiths",
+  report_points:"Belangrijkste punten",report_takeaway:"Om te onthouden",report_warnings:"Waarschuwingen",
+  ai_note:"Door AI gegenereerde vertalingen en verwijzingen — onderwerp en verwijzingen te verifiëren door de imam.",
+  set_ai_note:"AI-mededeling weergeven",
   resumed_toast:"Opnieuw verbonden — {n} zin(nen) hersteld",corrected_toast:"Segment gecorrigeerd",
   ios_note:"Op iPhone/iPad heeft de browser geen spraakherkenning: gebruik “Audio → server” of “Handmatig”.",
   export_title:"Khutbah",export_none:"Nog niets om te exporteren.",
@@ -1229,12 +1425,40 @@ Object.assign(I18N.nl,{bc_mosque:"Naam van de moskee (getoond aan aanwezigen)",b
   quran_status_playing:"Nu aan het reciteren: {s}",
   home_tasbih:"📿 Tasbih — dhikr-teller",
   tasbih_h:"Tasbih — dhikr",tasbih_reset:"Opnieuw",
-  tasbih_hint:"Na het gebed: 33 keer Subhan Allah, 33 keer Alhamdulillah, 33 keer Allahu akbar, daarna de tahliil (34 keer)."});
+  tasbih_hint:"Na het gebed: 33 keer Subhan Allah, 33 keer Alhamdulillah, 33 keer Allahu akbar, daarna de tahliil (34 keer).",
+  arrival_h:"🕌 Aankomstmodus — Qibla",arrival_p:"Richt u terwijl u wacht op de khutbah naar de Qibla. De livevertaling is vanaf het begin beschikbaar.",
+  back_home:"Home",
+  qibla_bearing:"Qibla — richting ten opzichte van het noorden",qibla_manual:"Handmatig oriënteren",qibla_recal:"Positie opnieuw bepalen",
+  qibla_n:"N",qibla_e:"O",qibla_s:"Z",qibla_w:"W",
+  qibla_status_gps:"GPS-positie gedetecteerd",
+  qibla_status_gps_ok:"GPS-positie — sensor actief. Lijn de 🕋 uit met de punt.",
+  qibla_status_gps_search:"Locatie bepalen…",
+  qibla_status_gps_denied:"Locatie geweigerd — gebruik de handmatige modus.",
+  qibla_status_manual:"Handmatige modus — draai tot de 🕋 bovenaan de wijzerplaat staat.",
+  qibla_status_off:"Kompassensor niet beschikbaar — gebruik de handmatige modus.",
+  qibla_status_pos_missing:"Positie onbekend — sta locatietoegang toe of gebruik de handmatige modus.",
+  ask_h:"🙋 Ask My Mosque — stel een vraag",
+  ask_p:"Door AI gegenereerd antwoord, gebaseerd op de huidige khutbah — te verifiëren door de imam.",
+  ask_ph:"Uw vraag…",ask_send:"Versturen",ask_loading:"Denken…",
+  ask_join:"Sluit eerst aan bij een sessie.",ask_empty:"Schrijf een vraag.",
+  ask_err:"Antwoord niet beschikbaar.",ask_refs:"Referenties",
+  st_live:"📊 Live",st_live_hint:"Luisteraars elke 5 s gesampled tijdens de uitzending — automatisch ververst.",
+  st_listens:"luisteraars",st_peak:"piek",st_joins:"toegetreden",st_dur:"duur",st_seg:"segmenten",
+  st_wait:"Wachten op samples…",st_langs_now:"Talen op dit moment"});
 Object.assign(I18N.ar,{bc_mosque:"اسم المسجد (يُعرَض للمصلّين)",bc_langs:"اللغات المترجَمة افتراضيًا",
   bc_glossary:"مسرد المسجد (اختياري)",bc_glossary_hint:"أسماء الأعلام والمصطلحات المحلّية والنقحرة المطلوبة. يُضاف إلى كل ترجمة.",
   bc_correct:"✏️ تصحيح هذا المقطع",bc_correct_send:"إعادة الإرسال مُصحَّحًا",
   join_simple:"وضع مبسّط (نص كبير جدًا، بدون إعدادات)",simple_exit:"✕ الإعدادات",set_simple:"وضع مبسّط (نص كبير جدًا)",
   hist_print:"طباعة / PDF",hist_txt:"تنزيل .txt",
+  bc_report:"📋 تقرير نهاية الخطبة",report_h:"تقرير الجلسة",
+  report_disclaimer:"تقرير من إنشاء الذكاء الاصطناعي — الموضوع والمراجع والنقاط يراجعها الإمام.",
+  report_loading:"جارٍ إنشاء التقرير…",report_err:"التقرير غير متاح",
+  report_none:"لا توجد بعد جمل كافية لتقرير (2 على الأقل).",
+  report_segments:"مقطع",report_subject:"الموضوع",report_duration:"المدة",
+  report_verses:"الآيات المذكورة",report_hadiths:"الأحاديث المذكورة",
+  report_points:"النقاط الرئيسية",report_takeaway:"ما يجب تذكّره",report_warnings:"تنبيهات",
+  ai_note:"الترجمات والمراجع مولّدة بالذكاء الاصطناعي — يراجع الإمام الموضوع والمراجع.",
+  set_ai_note:"إظهار تنبيه الذكاء الاصطناعي",
   resumed_toast:"أُعيد الاتصال — تمّت استعادة {n} جملة",corrected_toast:"تمّ تصحيح المقطع",
   ios_note:"على iPhone/iPad لا يتوفّر تعرّف الكلام في المتصفّح: استخدم «الصوت → الخادم» أو «يدوي».",
   export_title:"الخطبة",export_none:"لا شيء للتصدير بعد.",
@@ -1249,7 +1473,26 @@ Object.assign(I18N.ar,{bc_mosque:"اسم المسجد (يُعرَض للمصلّ
   quran_status_playing:"يتمّ الآن تلاوة: {s}",
   home_tasbih:"📿 تسبيح — عَدّاد الذِّكر",
   tasbih_h:"التسبيح — الذِّكر",tasbih_reset:"إعادة",
-  tasbih_hint:"بعد الصلاة: ٣٣ مرة سبحان الله، ٣٣ مرة الحمد لله، ٣٣ مرة الله أكبر، ثم التهليل (٣٤ مرة)."});
+  tasbih_hint:"بعد الصلاة: ٣٣ مرة سبحان الله، ٣٣ مرة الحمد لله، ٣٣ مرة الله أكبر، ثم التهليل (٣٤ مرة).",
+  arrival_h:"وضع الوصول — القبلة",arrival_p:"أثناء انتظار الخطبة، اوجّه نفسك نحو القبلة. الترجمة المباشرة متاحة منذ البداية.",
+  back_home:"الرئيسية",
+  qibla_bearing:"القبلة — الاتجاه من الشمال",qibla_manual:"توجيه يدوي",qibla_recal:"إعادة تحديد الموقع",
+  qibla_n:"شمال",qibla_e:"شرق",qibla_s:"جنوب",qibla_w:"غرب",
+  qibla_status_gps:"تم تحديد الموقع عبر GPS",
+  qibla_status_gps_ok:"موقع GPS — المستشعر نشط. حاذِ 🕋 مع الرأس.",
+  qibla_status_gps_search:"جارٍ تحديد الموقع…",
+  qibla_status_gps_denied:"رُفض تحديد الموقع — استخدم الوضع اليدوي.",
+  qibla_status_manual:"الوضع اليدوي — دوّر حتى تكون 🕋 في أعلى القرص.",
+  qibla_status_off:"مستشعر البوصلة غير متاح — استخدم الوضع اليدوي.",
+  qibla_status_pos_missing:"الموقع غير معروف — اسمح بالوصول للموقع أو استخدم الوضع اليدوي.",
+  ask_h:"🙋 اسأل مسجدي — اطرح سؤالًا",
+  ask_p:"جواب مولّد بالذكاء الاصطناعي، مبنيّ على الخطبة الحالية — يراجعه الإمام.",
+  ask_ph:"سؤالك…",ask_send:"إرسال",ask_loading:"يفكّر…",
+  ask_join:"انضمّ إلى الجلسة أولًا.",ask_empty:"اكتب سؤالًا.",
+  ask_err:"الجواب غير متاح.",ask_refs:"المراجع",
+  st_live:"📊 مباشر",st_live_hint:"عيّنة من المستمعين كل 5 ثوانٍ أثناء البث — تُحدَّث تلقائيًا.",
+  st_listens:"مستمعون",st_peak:"الذروة",st_joins:"انضمّوا",st_dur:"المدة",st_seg:"الأجزاء",
+  st_wait:"بانتظار العينات…",st_langs_now:"اللغات الآن"});
 let uiLang = localStorage.getItem("uiLang") || (navigator.language||"fr").slice(0,2);
 if(!I18N[uiLang]) uiLang = "fr";
 function t(k){ return (I18N[uiLang] && I18N[uiLang][k]) || (I18N.fr[k]) || k; }
@@ -1264,6 +1507,7 @@ function applyI18n(){
   updateDhikr && updateDhikr();
   renderHijriDate && renderHijriDate();
   tasbihRender && tasbihRender();
+  renderQiblaLabels && renderQiblaLabels();
   prayerRenderHome && prayerRenderHome();
   if(typeof libRender === "function"){ try{ libRender(); }catch(e){} }
 }
@@ -1274,8 +1518,11 @@ function applyI18n(){
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const API = location.origin;
-function show(id){ ["screen-home","screen-broadcaster","screen-join","screen-listener"].forEach(s=>{
-  $("#"+s).classList.toggle("hidden", s!==id); }); }
+function show(id){ ["screen-home","screen-broadcaster","screen-join","screen-listener","screen-arrival"].forEach(s=>{
+  $("#"+s).classList.toggle("hidden", s!==id); });
+  if(id!=="screen-broadcaster" && typeof BCstatsTimer!=="undefined" && BCstatsTimer){
+    clearInterval(BCstatsTimer); BCstatsTimer=null;
+  } }
 function toast(msg){ const el=document.createElement("div"); el.className="toast"; el.textContent=msg;
   document.body.appendChild(el); setTimeout(()=>el.remove(), 2600); }
 function fmtTime(ts){ const d=new Date(ts); return d.toLocaleTimeString(uiLang,{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
@@ -1453,6 +1700,10 @@ updateDhikr();
 /* Date hijri du jour (calendrier islamique natif du navigateur, sinon masquée). */
 function renderHijriDate(){
   const el=$("#hijriDate"); if(!el) return;
+  const fill = (id, txt)=>{
+    const e=$("#"+id);
+    if(e){ e.textContent="📅 "+txt; e.classList.remove("hidden"); }
+  };
   try{
     const loc = (uiLang==="ar") ? "ar-DZ-u-ca-islamic-umalqura" : "fr-FR-u-ca-islamic";
     const fmt = new Intl.DateTimeFormat(loc, {day:"numeric", month:"long", year:"numeric"});
@@ -1462,9 +1713,114 @@ function renderHijriDate(){
     if(!now || now===greg || now.indexOf("Invalid")===0 || !hijriish) throw 0;
     el.textContent = "📅 " + now;
     el.classList.remove("hidden");
-  }catch(e){ el.classList.add("hidden"); }
+    fill("arrivalDate", now);
+  }catch(e){ el.classList.add("hidden"); const a=$("#arrivalDate"); if(a) a.classList.add("hidden"); }
 }
 renderHijriDate();
+
+/* --- Qibla & mode arrivée : boussole vers la Kaaba (22°31' N, 39°49' E) --- */
+const KAABA={lat:21.4225, lon:39.8262};
+const qt={lat:null, lon:null, source:"", heading:null, bearing:null,
+          manual:false, manualDeg:0, _timer:null};
+function qiblaBearing(lat,lon){
+  const φ1=lat*Math.PI/180, φ2=KAABA.lat*Math.PI/180,
+        Δλ=(KAABA.lon-lon)*Math.PI/180;
+  const y=Math.sin(Δλ)*Math.cos(φ2),
+        x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function qtSave(){
+  try{ localStorage.setItem("qibla", JSON.stringify(
+    {lat:qt.lat, lon:qt.lon, source:qt.source, manualDeg:qt.manualDeg})); }catch(e){}
+}
+function qtLoad(){
+  try{
+    const m=JSON.parse(localStorage.getItem("qibla")||"{}");
+    if(typeof m.lat==="number" && typeof m.lon==="number" && isFinite(m.lat) && isFinite(m.lon)){
+      qt.lat=m.lat; qt.lon=m.lon; qt.source=m.source==="gps"?"gps":"";
+    }
+    if(typeof m.manualDeg==="number") qt.manualDeg=m.manualDeg;
+  }catch(e){}
+  if(qt.lat==null || qt.lon==null) qtUseGps();
+}
+function qtStatus(k){
+  const el=$("#qibla-status");
+  if(el) el.textContent = k ? t("qibla_status_"+k) : "";
+}
+function qtUseGps(){
+  if(!navigator.geolocation){ qtStatus("off"); return; }
+  qtStatus("gps_search");
+  navigator.geolocation.getCurrentPosition(pos=>{
+    qt.lat=pos.coords.latitude; qt.lon=pos.coords.longitude; qt.source="gps";
+    qtSave(); qtUpdate();
+  }, ()=>qtStatus("gps_denied"), {timeout:10000, maximumAge:300000});
+}
+function qtEnterManual(){
+  if(qt.manual) return;
+  qt.manual=true; qt.heading=qt.manualDeg;
+  const box=$("#qibla-manualBox"); if(box) box.classList.remove("hidden");
+  const s=$("#qibla-manual"); if(s) s.value=qt.manualDeg;
+  const d=$("#qibla-manualDeg"); if(d) d.textContent=qt.manualDeg+"°";
+  qtStatus("manual");
+  qtUpdate();
+}
+function qtUpdate(){
+  const b=(qt.lat!=null && qt.lon!=null) ? qiblaBearing(qt.lat,qt.lon) : null;
+  qt.bearing=b;
+  const out=$("#qibla-bearing"); if(out) out.textContent = b==null ? "—" : Math.round(b)+"°";
+  const h = qt.manual ? qt.manualDeg : qt.heading;
+  const k=$("#compass-kaaba");
+  if(k){
+    if(b!=null && h!=null){
+      const rot=(b - h + 360)%360;
+      const ring=$("#compass");
+      const r=Math.max(48, (ring?ring.offsetWidth/2:90)-20);
+      k.style.transform=`translate(-50%,-50%) rotate(${rot}deg) translateY(-${r}px) rotate(-${rot}deg)`;
+    } else { k.style.transform=""; }
+  }
+  const st = b==null ? "pos_missing" : (qt.manual ? "manual" : "gps_ok");
+  qtStatus(st);
+}
+function qtOnOrient(ev){
+  if(qt.manual) return;
+  let a=null;
+  try{ a = ev.absolute && ev.alpha!=null ? ev.alpha : null; }catch(e){}
+  if(a==null){ qtEnterManual(); return; }
+  qt.heading=a;
+  if(qt._timer){ clearTimeout(qt._timer); qt._timer=null; }
+  qtUpdate();
+}
+function qtStart(){
+  qtLoad();
+  qtUpdate();
+  if(qt.manual){ qtEnterManual(); return; }
+  qt.manual=false; qt.heading=null;
+  const req = window.DeviceOrientationEvent && "requestPermission" in DeviceOrientationEvent;
+  if(req){
+    DeviceOrientationEvent.requestPermission().then(state=>{
+      if(state==="granted") window.addEventListener("deviceorientation", qtOnOrient);
+      else qtEnterManual();
+    }).catch(qtEnterManual);
+  } else if(window.DeviceOrientationEvent){
+    window.addEventListener("deviceorientation", qtOnOrient);
+  } else { qtEnterManual(); return; }
+  qt._timer=setTimeout(()=>{ if(qt.heading==null && !qt.manual) qtEnterManual(); }, 2000);
+}
+function renderQiblaLabels(){
+  const map={n:"qibla_n",e:"qibla_e",s:"qibla_s",w:"qibla_w"};
+  $$("#compass .cp[data-dir]").forEach(el=>{ el.textContent=t(map[el.dataset.dir]||""); });
+  const lb=$("#qibla-blabel"); if(lb) lb.textContent=t("qibla_bearing");
+}
+$("#btnArrivalHome").addEventListener("click", ()=>{ renderHijriDate(); qtStart(); show("screen-arrival"); });
+$("#btnArrivalJoin").addEventListener("click", ()=>{ show("screen-join"); });
+$("#btnQiblaRecal").addEventListener("click", ()=>{ qtUseGps(); });
+$("#btnQiblaManual").addEventListener("click", ()=>{ qtEnterManual(); });
+$("#qibla-manual").addEventListener("input", e=>{
+  qt.manualDeg=+e.target.value;
+  $("#qibla-manualDeg").textContent=qt.manualDeg+"°";
+  if(qt.manual){ qt.heading=qt.manualDeg; }
+  qtUpdate();
+});
 
 /* --- Tasbih : compteur de dhikr (33 ×3 puis 34 pour le tahlîl) --- */
 const TASBIH=[
@@ -1798,7 +2154,7 @@ $("#join-code").addEventListener("change",e=>{
 const BC = {
   code:null, token:null, ws:null, recog:null, recording:false, status:"idle",
   audioStream:null, mediaRec:null, analyser:null, rafMeter:null, geminiOn:true,
-  lastSeq:0,
+  lastSeq:0, history:[],
 };
 
 /* Détecte ce qui n'est pas possible ici et adapte les modes de captation. */
@@ -1914,6 +2270,7 @@ function bcOnMsg(m){
     }
     $("#bc-monMeta").textContent = bits.join("  ·  ");
     $("#bc-correctBox").classList.add("hidden");
+    bcPushHistory(m);
   }
   else if(m.type==="stt"){
     $("#bc-monAr").textContent = m.text||"";
@@ -1921,6 +2278,17 @@ function bcOnMsg(m){
   }
   else if(m.type==="config_ok"){ toast("Glossaire mis à jour"); }
   else if(m.type==="error"){ toast(m.message||"erreur"); }
+}
+
+/* Historique du diffuseur : reconstruit à partir des messages "monitor" (export PDF/TXT en fin de session). */
+function bcPushHistory(m){
+  if(typeof m.seq!=="number") return;
+  const rec={seq:m.seq, ts:m.ts||Date.now(), arabic:m.arabic||"",
+             text:m.preview||"", is_quran:!!m.is_quran,
+             quran_ref:m.quran_ref||null, is_hadith:false};
+  const i=BC.history.findIndex(p=>p.seq===m.seq);
+  if(i>=0) BC.history[i]=rec; else BC.history.push(rec);
+  if(BC.history.length>2000) BC.history.splice(0, BC.history.length-2000);
 }
 
 /* --- correction d'un segment déjà diffusé --- */
@@ -2149,12 +2517,116 @@ function stopSpeechRecognition(){
   if(BC.recog){ try{ BC.recog.onend=null; BC.recog.abort ? BC.recog.abort() : BC.recog.stop(); }catch(e){} BC.recog=null; }
 }
 
-/* --- Streaming audio -> serveur (repli) --- */
+/* --- Streaming audio -> serveur (repli) avec VAD (segmentation par silence) --- */
 function pickMime(){
   const cands=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"];
   for(const c of cands){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c; }
   return "";
 }
+
+/* Seuils de détection de parole (VAD) — à ajuster selon le micro / la salle. */
+const VAD = {
+  rmsMin:0.012,        /* seuil absolu minimal pour considérer la parole            */
+  floorMin:0.006,      /* plancher de bruit le plus bas                              */
+  floorMax:0.02,       /* plancher de bruit le plus haut                             */
+  floorFactor:2.5,     /* parole = bruit de fond × 2.5                               */
+  floorDecay:0.02,     /* baisse rapide du plancher par frame quand on parle         */
+  floorAdapt:0.03,     /* lente remontée du plancher pendant le silence              */
+  hangTime:350,        /* ms de son continu avant de valider un début de phrase      */
+  padSilence:1100,     /* ms de silence pour déclarer la phrase terminée             */
+  trailingPad:400,     /* délai de sécurité pour recevoir la dernière tranche (1 s)  */
+  maxDur:18000,        /* sécurité : envoi forcé même sans pause (imam sans repos)   */
+};
+
+/* Envoi d'un blob audio COMPLET vers le backend (chemin existant type:"audio"). */
+function vadSendBlob(blob, mime){
+  if(!BC.ws || !blob || !blob.size) return;
+  blob.arrayBuffer().then(buf=>{
+    let bin=""; const bytes=new Uint8Array(buf);
+    for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+    BC.ws.send({type:"audio", mime:mime||"audio/webm", data:btoa(bin)});
+  }).catch(()=>{});
+}
+
+/* AnalyserNode disponible : on réutilise celui du VU-mètre, sinon on en crée un. */
+function vadAnalyser(){
+  if(!BC.audioStream) return null;
+  if(BC.analyser) return BC.analyser;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return null;
+  try{
+    const ctx=new AC();
+    const src=ctx.createMediaStreamSource(BC.audioStream);
+    const an=ctx.createAnalyser(); an.fftSize=1024; an.smoothingTimeConstant=0.6;
+    src.connect(an);
+    BC._vadCtx=ctx;
+    return an;
+  }catch(e){ return null; }
+}
+
+/* Envoie la phrase accumulée en UN seul appel STT (une pause → une phrase). */
+function vadFinalize(){
+  const v=BC.vad; if(!v) return;
+  const chunks=BC.vadChunks||[];
+  if(BC.status!=="live" && BC.status!=="paused"){
+    v.speaking=false; v.started=false; v.pendingFinalize=0; return;
+  }
+  if(chunks.length){
+    const mime=v.mime||"audio/webm";
+    vadSendBlob(new Blob(chunks,{type:mime.split(";")[0]}), mime);
+  }
+  BC.vadChunks=[];
+  v.speaking=false; v.started=false; v.pendingFinalize=0; v.lastVoice=0;
+}
+
+/* Boucle d'analyse du niveau micro : découpe en phrases complètes (VAD). */
+function vadStartLoop(){
+  const v=BC.vad; if(!v) return;
+  v.mime=BC.mediaRec.mimeType || "audio/webm";
+  v.floor=v.rmsMin; v.speaking=false; v.started=false; v.pendingFinalize=0;
+  v.lastVoice=0; v.candidateStart=0; v.segmentStart=0;
+  const buf=new Uint8Array(v.an.frequencyBinCount);
+  const tick=()=>{
+    if(!BC.vad || !BC.mediaRec || BC.mediaRec.state!=="recording"){ v.raf=0; return; }
+    v.an.getByteTimeDomainData(buf);
+    let sum=0; for(let i=0;i<buf.length;i++){ const s=(buf[i]-128)/128; sum+=s*s; }
+    const rms=Math.sqrt(sum/buf.length);
+    const thr=Math.max(v.rmsMin, v.floor*VAD.floorFactor);
+    const now=performance.now();
+    if(rms>thr){
+      /* voix détectée */
+      v.lastVoice=now;
+      if(!v.started){ v.started=true; v.candidateStart=now; }
+      if(now-v.candidateStart>=VAD.hangTime){
+        if(!v.speaking){ v.speaking=true; v.segmentStart=now; bcSpeechStatus("ok"); }
+      }
+      v.pendingFinalize=0;                                // la pause est annulée
+      v.floor=Math.max(VAD.floorMin, v.floor*(1-VAD.floorDecay));
+    } else {
+      /* silence */
+      if(v.started && now-v.lastVoice>=VAD.hangTime){ v.started=false; v.candidateStart=0; }
+      if(v.speaking){
+        if(!v.pendingFinalize && now-v.lastVoice>=VAD.padSilence){ v.pendingFinalize=now+VAD.trailingPad; }
+        if(v.pendingFinalize && now>=v.pendingFinalize){ vadFinalize(); bcSpeechStatus("wait"); }
+      } else if(!v.started){
+        v.floor=Math.min(VAD.floorMax, v.floor+(Math.max(0,rms)-v.floor)*VAD.floorAdapt);
+      }
+    }
+    /* sécurité : phrase trop longue sans pause → envoi quand même (reste proche du direct) */
+    if(v.speaking && now-v.segmentStart>=VAD.maxDur){ vadFinalize(); }
+    v.raf=requestAnimationFrame(tick);
+  };
+  v.raf=requestAnimationFrame(tick);
+}
+
+/* Vide la phrase en cours (pause / arrêt) sans perdre la fin de la phrase. */
+function vadFlush(){
+  const chunks=BC.vadChunks||[]; if(!chunks.length) return;
+  const mime=BC._vadMime||"audio/webm";
+  vadSendBlob(new Blob(chunks,{type:mime.split(";")[0]}), mime);
+  BC.vadChunks=[];
+}
+
 async function startAudioStreaming(){
   if(!window.MediaRecorder){ bcSpeechStatus("err", t("sr_startfail")); toast(t("sr_startfail")); return; }
   if(!BC.audioStream){
@@ -2166,16 +2638,38 @@ async function startAudioStreaming(){
   const mime=pickMime();
   try{ BC.mediaRec = mime ? new MediaRecorder(BC.audioStream,{mimeType:mime}) : new MediaRecorder(BC.audioStream); }
   catch(e){ toast("MediaRecorder: "+e.message); return; }
-  BC.mediaRec.ondataavailable = async (ev)=>{
-    if(!ev.data || ev.data.size < 1200) return;      // ignore les tranches quasi-vides
-    const buf = await ev.data.arrayBuffer();
-    let bin=""; const bytes=new Uint8Array(buf);
-    for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
-    BC.ws.send({type:"audio", mime:(ev.data.type||mime||"audio/webm"), data:btoa(bin)});
-  };
-  BC.mediaRec.start(4000);     // une tranche toutes les 4 s
+  BC.vadChunks=[];
+  const an=vadAnalyser();
+  if(an){
+    /* Mode nominal : tranches de 1 s accumulées, envoyées uniquement après une
+       vraie pause de l'imam → une phrase complète = un appel STT + une traduction. */
+    BC.vad={an:an, rmsMin:VAD.rmsMin, raf:0, speaking:false, started:false,
+            pendingFinalize:0, lastVoice:0, candidateStart:0, segmentStart:0, mime:""};
+    BC._vadMime="";
+    BC.mediaRec.ondataavailable=ev=>{ if(ev.data && ev.data.size>=400) BC.vadChunks.push(ev.data); };
+    BC.mediaRec.start(1000);     // tranches de 1 s (recollées ensuite en une phrase)
+    vadStartLoop();
+  } else {
+    /* Repli : aucune analyse possible → tranches fixes de 4 s (comportement historique). */
+    bcSpeechStatus("warn", t("sr_vad_off"));
+    BC._vadMime="";
+    BC.mediaRec.ondataavailable=ev=>{
+      if(!ev.data || ev.data.size < 1200) return;      // ignore les tranches quasi-vides
+      vadSendBlob(ev.data, ev.data.type||mime||"audio/webm");
+    };
+    BC.mediaRec.start(4000);     // une tranche toutes les 4 s
+  }
 }
-function stopAudioStreaming(){ if(BC.mediaRec){ try{ BC.mediaRec.stop(); }catch(e){} BC.mediaRec=null; } }
+function stopAudioStreaming(){
+  if(BC.vad){
+    BC._vadMime=BC.vad.mime||(BC.mediaRec&&BC.mediaRec.mimeType)||"audio/webm";
+    try{ cancelAnimationFrame(BC.vad.raf); }catch(e){}
+    BC.vad=null;
+  }
+  if(BC.mediaRec){ try{ BC.mediaRec.stop(); }catch(e){} BC.mediaRec=null; }
+  if(BC._vadCtx){ try{ BC._vadCtx.close(); }catch(e){} BC._vadCtx=null; }
+  setTimeout(vadFlush, 350);     // laisse la dernière tranche arriver après stop()
+}
 
 /* ==========================================================================
    ========================  AUDITEUR  ====================================
@@ -2188,6 +2682,7 @@ const LS = {
   voiceURI:localStorage.getItem("voiceURI")||"",
   showAr: localStorage.getItem("showAr")!=="0",
   simple: localStorage.getItem("simple")==="1",
+  aiNote: localStorage.getItem("aiNote")!=="0",
   ttsQueue:[], speaking:false,
 };
 
@@ -2197,6 +2692,13 @@ function applySimple(){
   const j=$("#join-simple"); if(j) j.checked=LS.simple;
   const x=$("#btnSimpleExit"); if(x) x.classList.toggle("hidden", !LS.simple);
 }
+function applyAiNote(){
+  const n=$("#aiNote"); if(n) n.classList.toggle("hidden", !LS.aiNote || LS.simple);
+  const c=$("#set-ai-note"); if(c) c.checked = LS.aiNote;
+}
+$("#set-ai-note").addEventListener("change",e=>{
+  LS.aiNote=e.target.checked; localStorage.setItem("aiNote",LS.aiNote?"1":"0"); applyAiNote();
+});
 $("#btnSimpleExit") && $("#btnSimpleExit").addEventListener("click", ()=>{
   LS.simple=false; localStorage.setItem("simple","0"); applySimple(); $("#sheet-settings").classList.remove("hidden");
 });
@@ -2414,6 +2916,7 @@ function applyListenerSettings(){
   $("#set-lang").value=LS.lang;
   $$("#set-modeSeg button").forEach(x=>x.classList.toggle("on", x.dataset.m===LS.recv));
   applySimple();
+  applyAiNote();
 }
 $("#btnSettings").addEventListener("click",()=>{ loadVoices(); $("#sheet-settings").classList.remove("hidden"); });
 $("#btnCloseSettings").addEventListener("click",()=>$("#sheet-settings").classList.add("hidden"));
@@ -2432,38 +2935,36 @@ $("#set-simple").addEventListener("change",e=>{ LS.simple=e.target.checked; loca
 $("#join-simple").addEventListener("change",e=>{ LS.simple=e.target.checked; });
 
 /* --- export de la khutbah (client, sans dépendance) --- */
-function exportRows(){
-  return LS.history.slice().sort((a,b)=>(a.seq||0)-(b.seq||0)).map(p=>({
+function exportRows(src){
+  return (src||LS.history).slice().sort((a,b)=>(a.seq||0)-(b.seq||0)).map(p=>({
     time:fmtTime(p.ts||Date.now()),
     ar:p.arabic||"", tx:p.text||"",
     ref:p.is_quran?(p.quran_ref||"Qur'ān"):(p.is_hadith?"Hadith":"")
   }));
 }
-$("#btnExportTxt").addEventListener("click",()=>{
-  const rows=exportRows();
+function exportTxt(rows, code, lang, mosque){
   if(!rows.length){ toast(t("export_none")); return; }
-  const head=`${t("export_title")} — ${LS.mosque||LS.code} — ${new Date().toLocaleString(uiLang)}\n${"=".repeat(48)}\n\n`;
+  const head=`${t("export_title")} — ${mosque||code} — ${new Date().toLocaleString(uiLang)}\n${"=".repeat(48)}\n\n`;
   const body=rows.map(r=>`[${r.time}]${r.ref?" ("+r.ref+")":""}\n${r.ar?r.ar+"\n":""}${r.tx}\n`).join("\n");
   const blob=new Blob([head+body],{type:"text/plain;charset=utf-8"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download=`khutbah-${LS.code}-${LS.lang}.txt`;
+  a.download=`khutbah-${code}${lang?"-"+lang:""}.txt`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-});
-$("#btnExportPrint").addEventListener("click",()=>{
-  const rows=exportRows();
+}
+function exportPrint(rows, code, lang, mosque){
   if(!rows.length){ toast(t("export_none")); return; }
   const esc=escapeHtml;
   const html=`<!doctype html><html lang="${uiLang}" dir="${uiLang==="ar"?"rtl":"ltr"}"><head><meta charset="utf-8">
-    <title>${esc(t("export_title"))} ${esc(LS.code)}</title><style>
+    <title>${esc(t("export_title"))} ${esc(code)}</title><style>
     body{font:15px/1.6 system-ui,Arial,sans-serif; max-width:720px; margin:24px auto; padding:0 16px; color:#111}
     h1{font-size:20px} .m{color:#666; font-size:12px} .ar{font-size:17px; direction:rtl}
     .row{margin:14px 0; padding-bottom:10px; border-bottom:1px solid #ddd}
     .ref{display:inline-block; background:#eef; border:1px solid #ccd; border-radius:10px; padding:1px 8px; font-size:11px}
     @media print{.noprint{display:none}}</style></head><body>
-    <h1>${esc(t("export_title"))} — ${esc(LS.mosque||LS.code)}</h1>
-    <p class="m">${new Date().toLocaleString(uiLang)} · ${esc(LS.lang)} · ${rows.length} segments</p>
+    <h1>${esc(t("export_title"))} — ${esc(mosque||code)}</h1>
+    <p class="m">${new Date().toLocaleString(uiLang)} · ${esc(lang)} · ${rows.length} segments</p>
     <button class="noprint" onclick="print()">Imprimer / PDF</button>
     ${rows.map(r=>`<div class="row">${r.ref?`<span class="ref">${esc(r.ref)}</span> `:""}<span class="m">${esc(r.time)}</span>
       ${r.ar?`<div class="ar">${esc(r.ar)}</div>`:""}<div>${esc(r.tx)}</div></div>`).join("")}
@@ -2472,7 +2973,181 @@ $("#btnExportPrint").addEventListener("click",()=>{
   if(!w){ toast("Autorisez les fenêtres pop-up"); return; }
   w.document.open(); w.document.write(html); w.document.close();
   setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 350);
-});
+}
+$("#btnExportTxt").addEventListener("click",()=>exportTxt(exportRows(), LS.code, LS.lang, LS.mosque));
+$("#btnExportPrint").addEventListener("click",()=>exportPrint(exportRows(), LS.code, LS.lang, LS.mosque));
+$("#btnBcExportTxt").addEventListener("click",()=>exportTxt(exportRows(BC.history), BC.code, "", BC.mosque));
+$("#btnBcExportPrint").addEventListener("click",()=>exportPrint(exportRows(BC.history), BC.code, "", BC.mosque));
+
+/* --- rapport automatique de la session (résumé IA) --- */
+let bcReportCache=null;   // {lang, report}
+function reportSections(report){
+  const secs=[
+    {label:t("report_subject"), items:[report.sujet]},
+    {label:t("report_duration"), items:[report.duree_min?`${report.duree_min} min`:""]},
+    {label:t("report_verses"), items:report.versets||[]},
+    {label:t("report_hadiths"), items:report.hadiths||[]},
+    {label:t("report_points"), items:report.points_principaux||[]},
+    {label:t("report_takeaway"), items:report.a_retentir||[]},
+    {label:t("report_warnings"), items:report.avertissements||[]},
+  ].map(s=>({label:s.label, items:(s.items||[]).map(x=>String(x).trim()).filter(Boolean)}));
+  return secs;
+}
+function renderReport(report){
+  $("#report-meta").textContent=
+    `${BC.mosque||BC.code} · ${new Date().toLocaleString(uiLang)} · ${(BC.history||[]).length} ${t("report_segments")}`;
+  const secs=reportSections(report).filter(s=>s.items.length);
+  $("#report-sections").innerHTML = secs.length
+    ? `<div class="row" style="margin:10px 0">` +
+        secs.map(s=>`<div style="margin:12px 0">`+
+            `<div class="muted" style="font-size:.78rem; text-transform:uppercase; letter-spacing:.04em">${escapeHtml(s.label)}</div>`+
+            s.items.map(x=>`<div style="margin:2px 0">• ${escapeHtml(x)}</div>`).join("")+
+            `</div>`).join("") +
+      `</div>`
+    : t("report_none");
+}
+async function bcGenerateReport(){
+  const btn=$("#btnBcReport"), st=$("#report-status");
+  if(!BC.code || !BC.token){ toast(t("report_err")); return; }
+  const n=(BC.history||[]).length;
+  if(n<2){ toast(t("report_none")); return; }
+  btn.disabled=true;
+  st.classList.remove("hidden"); st.textContent=t("report_loading");
+  try{
+    const transcript=(BC.history||[]).slice(-250)
+      .sort((a,b)=>(a.seq||0)-(b.seq||0))
+      .map(p=>({arabic:p.arabic||"", ts:p.ts||0,
+                is_quran:!!p.is_quran, quran_ref:p.quran_ref||null,
+                is_hadith:!!p.is_hadith}));
+    const r=await fetch(`${API}/api/session/${encodeURIComponent(BC.code)}/report?token=${encodeURIComponent(BC.token)}`,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({transcript, lang:uiLang})
+    });
+    const data=await r.json().catch(()=>null);
+    if(!r.ok){ const d=data&&data.detail; throw new Error(typeof d==="string"?d:String(r.status)); }
+    bcReportCache={lang:uiLang, report:data};
+    renderReport(data);
+    st.classList.add("hidden");
+    $("#sheet-report").classList.remove("hidden");
+  }catch(err){
+    st.textContent=`${t("report_err")} (${err.message})`;
+  }finally{ btn.disabled=false; }
+}
+function exportReportTxt(){
+  if(!bcReportCache){ toast(t("report_err")); return; }
+  const r=bcReportCache.report;
+  const esc=t=>t;
+  const head=`${t("report_h")} — ${BC.mosque||BC.code} — ${new Date().toLocaleString(uiLang)}\n${"=".repeat(48)}\n`;
+  const body=reportSections(r).filter(s=>s.items.length)
+    .map(s=>`\n${s.label}\n${"-".repeat(Math.min(40,s.label.length+2))}\n`+s.items.map(x=>` • ${x}`).join("\n")).join("\n");
+  const blob=new Blob([head+body],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`rapport-${BC.code}.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+function exportReportPrint(){
+  if(!bcReportCache){ toast(t("report_err")); return; }
+  const r=bcReportCache.report;
+  const esc=escapeHtml;
+  const secs=reportSections(r).filter(s=>s.items.length);
+  const html=`<!doctype html><html lang="${uiLang}" dir="${uiLang==="ar"?"rtl":"ltr"}"><head><meta charset="utf-8">
+    <title>${esc(t("report_h"))} ${esc(BC.code)}</title><style>
+    body{font:15px/1.6 system-ui,Arial,sans-serif; max-width:720px; margin:24px auto; padding:0 16px; color:#111}
+    h1{font-size:20px} .m{color:#666; font-size:12px} .sec{margin:14px 0} h2{font-size:13px; color:#444; margin:0 0 4px}
+    .disc{margin-top:18px; font-size:11px; color:#888; border-top:1px solid #ddd; padding-top:8px}
+    @media print{.noprint{display:none}}</style></head><body>
+    <h1>${esc(t("report_h"))} — ${esc(BC.mosque||BC.code)}</h1>
+    <p class="m">${esc(t("report_disclaimer"))}</p>
+    <p class="m">${new Date().toLocaleString(uiLang)} · ${(BC.history||[]).length} ${esc(t("report_segments"))}</p>
+    ${secs.map(s=>`<div class="sec"><h2>${esc(s.label)}</h2>`+s.items.map(x=>`<div>• ${esc(x)}</div>`).join("")+`</div>`).join("")}
+    <p class="disc">${esc(t("report_disclaimer"))}</p>
+    <button class="noprint" onclick="print()">${esc(t("hist_print"))}</button>
+    </body></html>`;
+  const w=window.open("","_blank");
+  if(!w){ toast("Autorisez les fenêtres pop-up"); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 350);
+}
+$("#btnBcReport").addEventListener("click",bcGenerateReport);
+$("#btnReportPrint").addEventListener("click",exportReportPrint);
+$("#btnReportTxt").addEventListener("click",exportReportTxt);
+$("#btnCloseReport").addEventListener("click",()=>$("#sheet-report").classList.add("hidden"));
+
+/* --- Ask My Mosque : question à la khutbah (réponse IA ancrée) --- */
+function askOpen(){
+  if(!LS.code){ toast(t("ask_join")); show("screen-join"); return; }
+  $("#ask-status").classList.add("hidden");
+  $("#ask-ans").classList.add("hidden");
+  $("#sheet-ask").classList.remove("hidden");
+}
+async function askSend(){
+  const q=$("#ask-q").value.trim();
+  if(q.length<3){ toast(t("ask_empty")); return; }
+  const btn=$("#btnAskSend"), st=$("#ask-status"), ans=$("#ask-ans");
+  btn.disabled=true;
+  st.classList.remove("hidden"); st.textContent=t("ask_loading");
+  try{
+    const r=await fetch(`${API}/api/session/${encodeURIComponent(LS.code)}/ask`,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({question:q, lang:LS.lang})
+    });
+    const data=await r.json().catch(()=>null);
+    if(!r.ok){ const d=data&&data.detail; throw new Error(typeof d==="string"?d:String(r.status)); }
+    st.classList.add("hidden");
+    $("#ask-ans-text").textContent=data.answer||"—";
+    const refs=(data.references||[]).map(x=>String(x).trim()).filter(Boolean);
+    $("#ask-refs").innerHTML = refs.length
+      ? `<div style="margin-bottom:2px;font-weight:600">${escapeHtml(t("ask_refs"))}</div>`+
+        refs.map(x=>`• ${escapeHtml(x)}`).join("<br>")
+      : "";
+    ans.classList.remove("hidden");
+  }catch(err){
+    st.textContent=`${t("ask_err")} (${err.message})`;
+  }finally{ btn.disabled=false; }
+}
+$("#btnAskHome").addEventListener("click", askOpen);
+$("#btnAskTop").addEventListener("click", askOpen);
+$("#btnAskSend").addEventListener("click", askSend);
+$("#btnCloseAsk").addEventListener("click",()=>$("#sheet-ask").classList.add("hidden"));
+
+/* --- Khutbah Live Intelligence : panneau de statistiques du diffuseur --- */
+let BCstatsTimer=null;
+function bcStatsRender(s){
+  $("#st-now").textContent=s.listeners_now;
+  $("#st-peak").textContent=s.peak_listeners;
+  $("#st-joins").textContent=s.total_joins;
+  $("#st-min").textContent=Math.floor(s.live_minutes)+"′";
+  $("#st-seg").textContent=s.seq;
+  const ser=s.series||[], peak=Math.max(1,s.peak_listeners||1);
+  $("#bc-statsHist").innerHTML = ser.length
+    ? ser.map(p=>{ const h=Math.max(2,Math.round(52*p.n/peak));
+        return `<div style="flex:0 0 4px; height:${h}px; background:var(--accent); opacity:${p.n?0.6:0.12}; border-radius:2px" title="${p.n}"></div>`;
+      }).join("")
+    : `<span class="muted" style="font-size:.72rem">${t("st_wait")}</span>`;
+  const langs=s.per_language||{};
+  $("#bc-statsLangs").innerHTML = Object.keys(langs).length
+    ? `<div class="muted" style="font-size:.72rem; margin-bottom:2px">${t("st_langs_now")}</div>`+
+      `<div class="langchips">`+Object.entries(langs).map(([k,v])=>`<span class="pill">${k}&nbsp;<b>${v}</b></span>`).join("")+`</div>`
+    : "";
+}
+async function bcStatsFetch(){
+  if(!LS.code) return;
+  try{
+    const r=await fetch(`${API}/api/session/${encodeURIComponent(LS.code)}/stats`);
+    if(r.ok) bcStatsRender(await r.json());
+  }catch(e){}
+}
+function bcStatsOpen(){
+  const p=$("#bc-statsPanel");
+  const showIt=p.classList.contains("hidden");
+  p.classList.toggle("hidden",!showIt);
+  $("#btnBcStats").classList.toggle("secondary",!showIt);
+  if(BCstatsTimer){ clearInterval(BCstatsTimer); BCstatsTimer=null; }
+  if(showIt){ bcStatsFetch(); BCstatsTimer=setInterval(bcStatsFetch,5000); }
+}
+$("#btnBcStats").addEventListener("click",bcStatsOpen);
 
 $("#set-lang").addEventListener("change",e=>{
   LS.lang=e.target.value; localStorage.setItem("listenerLang",LS.lang);
@@ -2664,7 +3339,7 @@ applySimple();  // reflète une préférence "mode simple" mémorisée
    Navigation arrière (bouton « ‹ Retour » + bouton système / Android / geste)
    ========================================================================== */
 (function backNav(){
-  const SCREENS = ["screen-home","screen-broadcaster","screen-join","screen-listener"];
+  const SCREENS = ["screen-home","screen-broadcaster","screen-join","screen-listener","screen-arrival"];
   const _show = show;                 // show() est déjà enrobé (focus a11y)
   let suppress = false;               // true = navigation programmatique, ne pas empiler
 

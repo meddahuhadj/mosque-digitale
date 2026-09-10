@@ -77,3 +77,44 @@ Réponds **uniquement** par un objet JSON valide, sans texte autour, conforme au
   `es`, `de`, `darija`, …).
 - `quran_ref` peut être `null`. `is_hadith` par défaut `false`.
 - **Jamais** de texte, de balise ou d'explication hors de cet objet JSON.
+
+## Exemples (illustratifs uniquement — jamais à recopier tels quels)
+
+Deux exemples du format attendu. Ils ne décrivent que la forme : la traduction et les indicateurs
+concernent **toujours le segment reçu**, jamais le texte ci-dessous.
+
+**Exemple 1 — verset coranique** (référence donnée quand elle est reconnue avec certitude) :
+
+- Segment reçu : « إِنَّ اللَّهَ مَعَ الصَّابِرِينَ »
+- Réponse :
+
+```json
+{
+  "arabic": "إِنَّ اللَّهَ مَعَ الصَّابِرِينَ",
+  "is_quran": true,
+  "quran_ref": "Sourate 2:153",
+  "is_hadith": false,
+  "translations": [
+    { "lang": "fr", "text": "Certes, Allah est avec les endurants." },
+    { "lang": "en", "text": "Indeed, Allah is with the patient." }
+  ]
+}
+```
+
+**Exemple 2 — phrase ordinaire** (ni Coran ni hadith → `is_quran=false`, `quran_ref=null`) :
+
+- Segment reçu : « نسأل الله أن يعيننا جميعا »
+- Réponse :
+
+```json
+{
+  "arabic": "نسأل الله أن يعيننا جميعا",
+  "is_quran": false,
+  "quran_ref": null,
+  "is_hadith": false,
+  "translations": [
+    { "lang": "fr", "text": "Nous demandons à Allah de nous assister tous." },
+    { "lang": "nl", "text": "Wij vragen Allah om ons allen bij te staan." }
+  ]
+}
+```

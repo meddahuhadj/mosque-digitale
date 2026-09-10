@@ -38,6 +38,8 @@ from pathlib import Path
 
 import httpx
 
+from resilience import get_breaker, call_with_circuit_breaker
+
 # --------------------------------------------------------------------------- #
 # Configuration
 # --------------------------------------------------------------------------- #
@@ -471,8 +473,20 @@ async def translate_segment(
 
     errors: list[str] = []
     for name in chain:
+        breaker = get_breaker(name)
+        if not breaker.can_attempt():
+            print(f"[translate] circuit breaker open for {name}, skipping")
+            errors.append("circuit_open")
+            continue
         try:
-            result, err = await _TRANSLATE_IMPL[name](arabic_text, langs, glossary)
+            async def _call():
+                result, err = await _TRANSLATE_IMPL[name](arabic_text, langs, glossary)
+                return result, err
+            result, err = await call_with_circuit_breaker(
+                breaker,
+                _call,
+                fallback=lambda: (None, "circuit_open"),
+            )
         except Exception as exc:  # défensif : jamais casser le flux
             print(f"[{name}] exception: {exc!r}")
             result, err = None, "server"
@@ -569,3 +583,352 @@ async def transcribe_audio(audio_bytes: bytes, mime_type: str) -> str | None:
         if text:
             return text
     return None
+
+
+# --------------------------------------------------------------------------- #
+# API publique : rapport de session (résumé automatique de la khutbah)
+# --------------------------------------------------------------------------- #
+
+_REPORT_SYS = (
+    "Tu es un rédacteur spécialisé dans les comptes-rendus de prêche musulman (khutbah). "
+    "À partir de la transcription intégrale fournie, rédige un compte-rendu SOBRE, FIDÈLE et "
+    "structuré, dans la langue demandée (code langue fourni). "
+    "Consignes strictes :\n"
+    "- N'invente RIEN : le sujet, les points, les versets et les hadiths doivent venir "
+    "EXCLUSIVEMENT de la transcription fournie.\n"
+    "- Ne formule AUCUN jugement d'authenticité sur les hadiths (ne dis pas « authentique » "
+    "ou « faible »).\n"
+    "- Une référence coranique préfixée de « ≈ » est une référence DEVINÉE : maintiens-la "
+    "sous sa forme « ≈ Sourate N:V » (imam à vérifier), et signale-le dans avertissements.\n"
+    "- Conserve la terminologie islamique translittérée d'usage (salât, zakât, taqwa, ihsân…)\n"
+    "- points_principaux : 3 à 8 idées-clés, une phrase courte chacune.\n"
+    "- a_retentir : 2 à 4 actions ou enseignements pratiques à retenir.\n"
+    "- versets : citations coraniques sous la forme « Sourate N:V — (texte si fourni) ».\n"
+    "- hadiths : uniquement si la transcription en cite, sinon liste vide.\n"
+    "- duree_min : entier calculé depuis les horodatages fournis (arrondi).\n"
+    "- avertissements : liste de points à vérifier (références devinées, trous de transcription…).\n"
+    "Réponds UNIQUEMENT en JSON conforme au schéma, sans texte autour."
+)
+
+_REPORT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "sujet": {"type": "string"},
+        "langue": {"type": "string"},
+        "duree_min": {"type": "integer"},
+        "versets": {"type": "array", "items": {"type": "string"}},
+        "hadiths": {"type": "array", "items": {"type": "string"}},
+        "points_principaux": {"type": "array", "items": {"type": "string"}},
+        "a_retentir": {"type": "array", "items": {"type": "string"}},
+        "avertissements": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["sujet", "langue", "duree_min", "points_principaux"],
+}
+
+
+def _parse_obj(raw: str) -> dict | None:
+    """Parse JSON d'objet (tolérant aux barrières de texte)."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        s, e = raw.find("{"), raw.rfind("}")
+        if s == -1 or e == -1:
+            return None
+        try:
+            data = json.loads(raw[s:e + 1])
+        except json.JSONDecodeError:
+            return None
+    return data if isinstance(data, dict) else None
+
+
+async def _gemini_json(system: str, user: str, schema: dict) -> tuple[dict | None, str]:
+    global _gemini_key_idx
+    if not GEMINI_KEYS:
+        return None, "no_provider"
+    payload = {
+        "systemInstruction": {"parts": [{"text": system}]},
+        "contents": [{"role": "user", "parts": [{"text": user}]}],
+        "generationConfig": {
+            "temperature": 0.25, "topP": 0.9, "candidateCount": 1,
+            "maxOutputTokens": 2048, "responseMimeType": "application/json",
+            "responseSchema": schema,
+        },
+        "safetySettings": [
+            {"category": c, "threshold": "BLOCK_NONE"}
+            for c in ("HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
+                      "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT")
+        ],
+    }
+    url = f"{_GEMINI_BASE}/models/{GEMINI_MODEL}:generateContent"
+    err = "network"
+    n = len(GEMINI_KEYS)
+    for _ in range(n):
+        key = GEMINI_KEYS[_gemini_key_idx % n]
+        _gemini_key_idx += 1
+        try:
+            r = await _http().post(url, params={"key": key}, json=payload)
+        except (httpx.HTTPError, asyncio.TimeoutError) as exc:
+            print(f"[gemini] réseau: {exc!r}")
+            err = "network"
+            continue
+        if r.status_code == 200:
+            try:
+                parts = r.json()["candidates"][0]["content"]["parts"]
+                raw = "".join(p.get("text", "") for p in parts)
+            except (KeyError, IndexError, TypeError, ValueError):
+                return None, "bad_response"
+            data = _parse_obj(raw)
+            if data is None:
+                return None, "bad_response"
+            return data, ""
+        err = _status_to_error(r.status_code)
+        print(f"[gemini] HTTP {r.status_code} ({err})")
+        if err in ("quota", "server"):
+            continue
+        return None, err
+    return None, err
+
+
+async def _openai_json(base, key, model, system: str, user: str,
+                       extra_headers=None) -> tuple[dict | None, str]:
+    if not key:
+        return None, "no_provider"
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    if extra_headers:
+        headers.update(extra_headers)
+    body = {
+        "model": model,
+        "temperature": 0.25,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    }
+    try:
+        r = await _http().post(f"{base}/chat/completions", headers=headers, json=body)
+    except (httpx.HTTPError, asyncio.TimeoutError) as exc:
+        print(f"[{base}] réseau: {exc!r}")
+        return None, "network"
+    if r.status_code != 200:
+        err = _status_to_error(r.status_code)
+        print(f"[{base}] HTTP {r.status_code} ({err}): {r.text[:200]}")
+        return None, err
+    try:
+        raw = r.json()["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None, "bad_response"
+    data = _parse_obj(raw)
+    if data is None:
+        return None, "bad_response"
+    return data, ""
+
+
+async def summarize_session(
+    transcript: list[dict],
+    *,
+    lang: str = "fr",
+    mosque: str = "",
+    glossary: str = "",
+) -> dict | None:
+    """Génère le rapport automatique d'une session de khutbah.
+
+    `transcript` : liste ordonnée de {arabic, ts?, is_quran?, quran_ref?, is_hadith?}.
+    Retourne un dict structuré ou None si tous les fournisseurs échouent.
+    """
+    global _last_error, _last_provider
+
+    segs = [s for s in transcript if isinstance(s, dict) and str(s.get("arabic") or "").strip()]
+    if not segs:
+        _last_error = "no_content"
+        return None
+    if len(segs) > 250:                      # borne : garde la fin de la session
+        segs = segs[-250:]
+    lang = (lang or "fr").strip()[:8]
+    glossary = (glossary or "").strip()[:4000]
+
+    ts_all = [s.get("ts") for s in segs if isinstance(s.get("ts"), (int, float))]
+    duree_s = (max(ts_all) - min(ts_all)) / 1000.0 if len(ts_all) >= 2 else 0.0
+
+    head = [f"LANGUE du rapport : {lang}", f"MOSQUÉE : {mosque or '—'}",
+            f"DURÉE estimée : {int(round(duree_s / 60.0))} min"]
+    if glossary:
+        head.append(f"GLOSSAIRE (termes à respecter) : {glossary}")
+    user = "\n".join(head) + "\n\nKHUTBAH (segments dans l'ordre) :\n" + _fmt_transcript_lines(segs)
+
+    chain = [p for p in ("gemini", "groq", "openrouter") if _provider_configured(p)]
+    if not chain:
+        _last_error = "no_provider"
+        return None
+
+    errors: list[str] = []
+    system = _REPORT_SYS
+    for name in chain:
+        breaker = get_breaker(name)
+        if not breaker.can_attempt():
+            errors.append("circuit_open")
+            continue
+        try:
+            if name == "gemini":
+                async def _call_g():
+                    return await _gemini_json(system, user, _REPORT_SCHEMA)
+                impl = _call_g
+            elif name == "groq":
+                async def _call_gr():
+                    return await _openai_json(_GROQ_BASE, GROQ_KEY, GROQ_MODEL, system, user)
+                impl = _call_gr
+            else:
+                async def _call_or():
+                    return await _openai_json(
+                        _OPENROUTER_BASE, OPENROUTER_KEY, OPENROUTER_MODEL, system, user,
+                        extra_headers={"HTTP-Referer": "https://github.com/",
+                                       "X-Title": "khutbah"})
+                impl = _call_or
+            report, err = await call_with_circuit_breaker(
+                breaker, impl, fallback=lambda: (None, "circuit_open"))
+        except Exception as exc:
+            print(f"[{name}] exception: {exc!r}")
+            report, err = None, "server"
+        if report is not None:
+            _last_error = ""
+            _last_provider = name
+            report["duree_min"] = int(report.get("duree_min") or round(duree_s / 60.0))
+            for k in ("versets", "hadiths", "points_principaux", "a_retentir", "avertissements"):
+                v = report.get(k)
+                report[k] = ([str(x).strip() for x in v
+                              if x is not None and str(x).strip()]
+                             if isinstance(v, list) else [])
+            return report
+        errors.append(err)
+
+    _last_error = _worst(errors)
+    print(f"[report] tous les fournisseurs ont échoué ({chain} -> {errors})")
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# API publique : Ask My Mosque (question-réponse ancrée sur la session)
+# --------------------------------------------------------------------------- #
+
+_ASK_SYS = (
+    "Tu es l'assistant « Ask My Mosque » d'une mosquée. Tu réponds dans LA LANGUE "
+    "demandée (code langue fourni), à partir du prêche (khutbah) fourni en contexte. "
+    "Consignes strictes :\n"
+    "- Réponds d'abord en te basant sur le contenu de la khutbah fournie (sans l'inventer).\n"
+    "- Tu peux compléter par des connaissances islamiques générales, mais TOUJOURS de façon "
+    "sobre et prudente : signale quand la réponse sort du cadre du prêche.\n"
+    "- Ne présente JAMAIS un avis juridique (fatwa) comme définitif : recommande de consulter "
+    "l'imam/savant de la mosquée pour les questions pratiques (prière, famille, finance…).\n"
+    "- Ne cite aucun hadith sans être sûr de son contenu ; si tu cites, garde-le succinct et "
+    "sans jugement d'authenticité.\n"
+    "- Une référence coranique préfixée de « ≈ » est devinée : indique qu'elle est à vérifier.\n"
+    "- references : liste courte de références (versets, points du prêche) qui appuient la réponse, "
+    "préfixées de « ≈ » si incertaines ; vide si aucune.\n"
+    "Réponds UNIQUEMENT en JSON conforme au schéma, sans texte autour."
+)
+
+_ASK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "answer": {"type": "string"},
+        "references": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["answer"],
+}
+
+
+async def _run_llm_chain(system: str, user: str, schema: dict) -> dict | None:
+    """Appelle la chaîne gemini→groq→openrouter avec breakers et parsing JSON."""
+    global _last_error, _last_provider
+    chain = [p for p in ("gemini", "groq", "openrouter") if _provider_configured(p)]
+    if not chain:
+        _last_error = "no_provider"
+        return None
+    errors: list[str] = []
+    for name in chain:
+        breaker = get_breaker(name)
+        if not breaker.can_attempt():
+            errors.append("circuit_open")
+            continue
+        try:
+            if name == "gemini":
+                async def _call_g():
+                    return await _gemini_json(system, user, schema)
+                impl = _call_g
+            elif name == "groq":
+                async def _call_gr():
+                    return await _openai_json(_GROQ_BASE, GROQ_KEY, GROQ_MODEL, system, user)
+                impl = _call_gr
+            else:
+                async def _call_or():
+                    return await _openai_json(
+                        _OPENROUTER_BASE, OPENROUTER_KEY, OPENROUTER_MODEL, system, user,
+                        extra_headers={"HTTP-Referer": "https://github.com/",
+                                       "X-Title": "khutbah"})
+                impl = _call_or
+            data, err = await call_with_circuit_breaker(
+                breaker, impl, fallback=lambda: (None, "circuit_open"))
+        except Exception as exc:
+            print(f"[{name}] exception: {exc!r}")
+            data, err = None, "server"
+        if data is not None:
+            _last_error = ""
+            _last_provider = name
+            return data
+        errors.append(err)
+    _last_error = _worst(errors)
+    print(f"[ask] tous les fournisseurs ont échoué ({chain} -> {errors})")
+    return None
+
+
+def _fmt_transcript_lines(segs: list[dict]) -> str:
+    lines: list[str] = []
+    for i, s in enumerate(segs, 1):
+        tag = ""
+        if s.get("is_quran"):
+            ref = s.get("quran_ref")
+            tag = f"[verset {ref}]" if ref else "[verset]"
+        elif s.get("is_hadith"):
+            tag = "[hadith]"
+        elif str(s.get("quran_ref", "") or "").strip():
+            tag = f"[réf. ≈{s.get('quran_ref')}]"
+        lines.append(f"{i}. {tag} {str(s.get('arabic') or '').strip()}")
+    return "\n".join(lines)
+
+
+async def ask_question(
+    question: str,
+    transcript: list[dict],
+    *,
+    lang: str = "fr",
+    mosque: str = "",
+    glossary: str = "",
+) -> dict | None:
+    """Répond à `question` en s'appuyant sur la khutbah fournie.
+
+    Retourne {answer, references} ou None si tous les fournisseurs échouent.
+    """
+    global _last_error, _last_provider
+    question = (question or "").strip()[:400]
+    if not question:
+        _last_error = "no_question"
+        return None
+    lang = (lang or "fr").strip()[:8]
+    glossary = (glossary or "").strip()[:4000]
+
+    segs = [s for s in transcript if isinstance(s, dict) and str(s.get("arabic") or "").strip()]
+    if len(segs) > 250:                       # borne : garde la fin de la session
+        segs = segs[-250:]
+
+    head = [f"LANGUE de la réponse : {lang}", f"MOSQUÉE : {mosque or '—'}"]
+    if glossary:
+        head.append(f"GLOSSAIRE (termes à respecter) : {glossary}")
+    ctx = _fmt_transcript_lines(segs) or "(aucun segment de khutbah transmis)"
+    user = ("\n".join(head) +
+            "\n\nKHUTBAH (segments dans l'ordre, pour contexte) :\n" + ctx +
+            "\n\nQUESTION posée par un fidèle :\n" + question)
+
+    return await _run_llm_chain(_ASK_SYS, user, _ASK_SCHEMA)

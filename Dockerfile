@@ -1,27 +1,30 @@
-# Déploiement sur hôte persistant (Railway / Fly.io / Render / VPS)
-# Une seule instance = processus long : WebSockets + rooms en mémoire.
 FROM python:3.12-slim
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Dépendances d'abord (couche de cache efficace lors des rebuilds)
-COPY backend/requirements.txt ./requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Code applicatif
+# Copy application code
 COPY backend/ ./backend/
-COPY frontend/ ./frontend/
-COPY SYSTEM_PROMPT.md .
+COPY frontend/dist/ ./frontend/dist/
 
-# Config locale éventuelle servie par la plateforme (nejamais committer .env)
-ENV TZ=UTC
+# Create non-root user
+RUN useradd -m -u 1000 app && chown -R app:app /app
+USER app
 
-WORKDIR /app/backend
-
-# Main lit le port via la variable PORT fournie par la plateforme
+# Expose port
 EXPOSE 8000
-CMD ["python", "main.py"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')" || exit 1
+
+# Run with uvicorn
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -1,20 +1,14 @@
-# Artefacts locaux / secrets
-backend/.env
-backend/.venv/
-**/__pycache__/
+__pycache__
 *.pyc
-.venv/
-
-# Git
-.git/
+*.pyo
+.pytest_cache
+.coverage
+.git
 .gitignore
-
-# Éditeurs / OS
-.vscode/
-.idea/
-Thumbs.db
-.DS_Store
-
-# Journaux temporaires
-*.log
-npm-debug.log*
+README.md
+.env
+.venv
+venv/
+node_modules/
+/dist/
+.git/

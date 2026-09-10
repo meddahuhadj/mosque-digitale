@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import logging
 import os
 import secrets
 import time
@@ -43,12 +44,20 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 
 import quran_index
 import translator
+import redis_store
+import redis_pubsub
+import metrics
+import logging_config
 
 # --------------------------------------------------------------------------- #
 # Configuration
 # --------------------------------------------------------------------------- #
 
 FRONTEND_DIR = (Path(__file__).resolve().parent.parent / "frontend")
+DIST_DIR = FRONTEND_DIR / "dist"
+# Use dist/ if it exists (Vite build), otherwise use frontend/ directly
+if (DIST_DIR / "index.html").exists():
+    FRONTEND_DIR = DIST_DIR
 INDEX_HTML = FRONTEND_DIR / "index.html"
 
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
@@ -63,6 +72,10 @@ SESSION_TTL = 60 * 60 * 12          # 12 h sans activité -> purge
 IDLE_ROOM_TTL = int(os.getenv("IDLE_ROOM_TTL", str(20 * 60)))  # session jamais démarrée
 MAX_ROOMS = int(os.getenv("MAX_ROOMS", "300"))     # plafond global (anti-DoS mémoire)
 SEG_QUEUE_MAX = int(os.getenv("SEG_QUEUE_MAX", "24"))  # backlog max de segments par room
+
+# Redis configuration
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+ROOM_TTL = int(os.getenv("ROOM_TTL", str(12 * 60 * 60)))  # 12 hours
 
 # Langues proposées par l'interface. `ar` = flux original sans traduction.
 SUPPORTED_LANGUAGES: dict[str, str] = {
@@ -81,6 +94,17 @@ SUPPORTED_LANGUAGES: dict[str, str] = {
 }
 
 # --------------------------------------------------------------------------- #
+# Logging setup
+# --------------------------------------------------------------------------- #
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOG_JSON = os.getenv("LOG_JSON", "").lower() == "true"
+
+logging_config.setup_logging(level=LOG_LEVEL, json_format=LOG_JSON)
+logger = logging.getLogger(__name__)
+logger.info("Khutbah backend starting", extra={"version": "1.2.0"})
+
+# --------------------------------------------------------------------------- #
 # Modèle de session (Room)
 # --------------------------------------------------------------------------- #
 
@@ -92,30 +116,92 @@ def _gen_code(n: int = 6) -> str:
 
 
 class Room:
-    def __init__(self, code: str):
+    def __init__(self, code: str, *, from_redis: dict | None = None):
         self.code = code
-        self.token = secrets.token_urlsafe(18)
-        self.created_at = time.time()
-        self.last_activity = time.time()
-        self.status = "idle"  # idle | live | paused | stopped
+        if from_redis:
+            self.token = from_redis["token"]
+            self.created_at = from_redis["created_at"]
+            self.last_activity = from_redis["last_activity"]
+            self.status = from_redis["status"]
+            self.seq = from_redis["seq"]
+            self.dropped_segments = from_redis["dropped_segments"]
+            self.glossary = from_redis["glossary"]
+            self.mosque_name = from_redis["mosque_name"]
+            self.default_langs = from_redis["default_langs"]
+        else:
+            self.token = secrets.token_urlsafe(18)
+            self.created_at = time.time()
+            self.last_activity = time.time()
+            self.status = "idle"
+            self.seq = 0
+            self.dropped_segments = 0
+            self.glossary = ""
+            self.mosque_name = ""
+            self.default_langs = list(DEFAULT_TARGET_LANGS)
+
         self.broadcaster: WebSocket | None = None
-        # lang -> set[WebSocket]
         self.listeners: dict[str, set[WebSocket]] = {}
         self.ws_lang: dict[WebSocket, str] = {}
-        self.seq = 0
         self.history: deque[dict] = deque(maxlen=MAX_HISTORY)
         self.audio_source_level = 0.0
         self._lock = asyncio.Lock()
-        # File de segments *traités en série* : garantit que la diffusion et
-        # l'historique restent strictement dans l'ordre des `seq`, même si la
-        # traduction du segment N+1 revient avant celle de N.
         self._seg_q: asyncio.Queue = asyncio.Queue(maxsize=SEG_QUEUE_MAX)
         self._worker: asyncio.Task | None = None
-        self.dropped_segments = 0
-        # Personnalisation communautaire (renseignée à la création de session).
-        self.glossary: str = ""
-        self.mosque_name: str = ""
-        self.default_langs: list[str] = list(DEFAULT_TARGET_LANGS)
+        self._redis_dirty = False
+        # --- Khutbah Live Intelligence : statistiques temps réel ----------
+        self.live_started_at: float | None = None
+        self.peak_listeners = 0
+        self.peak_at = 0.0
+        self.total_joins = 0
+        self.stats_series: deque[dict] = deque(maxlen=720)   # échantillon / 5 s -> 60 min
+        self.stats_task: asyncio.Task | None = None
+
+    async def _sync_to_redis(self):
+        """Persist room state to Redis."""
+        if not self._redis_dirty:
+            return
+        try:
+            data = {
+                "code": self.code,
+                "token": self.token,
+                "created_at": self.created_at,
+                "last_activity": self.last_activity,
+                "status": self.status,
+                "seq": self.seq,
+                "dropped_segments": self.dropped_segments,
+                "glossary": self.glossary,
+                "mosque_name": self.mosque_name,
+                "default_langs": self.default_langs,
+                "listener_count": self.listener_count,
+                "lang_breakdown": self.lang_breakdown(),
+            }
+            await redis_store.save_room(data)
+            # Also persist history
+            await redis_store.save_history(self.code, list(self.history))
+            self._redis_dirty = False
+        except Exception as exc:
+            print(f"[redis sync] {self.code}: {exc!r}")
+
+    def touch(self):
+        self.last_activity = time.time()
+        self._redis_dirty = True
+
+    def mark_dirty(self):
+        self._redis_dirty = True
+
+    # --- comptage ------------------------------------------------------------
+    @property
+    def listener_count(self) -> int:
+        return sum(len(s) for s in self.listeners.values())
+
+    def lang_breakdown(self) -> dict[str, int]:
+        return {k: len(v) for k, v in self.listeners.items() if v}
+
+    def active_target_langs(self) -> list[str]:
+        langs = {l for l in self.listeners if self.listeners[l] and l != "ar"}
+        langs.update(self.default_langs)
+        langs.discard("ar")
+        return sorted(langs)
 
     # --- file de segments ordonnée ---------------------------------------
     def submit_segment(self, *, text: str | None = None, manual: bool = False,
@@ -126,8 +212,6 @@ class Room:
         try:
             self._seg_q.put_nowait(item)
         except asyncio.QueueFull:
-            # Backlog : la traduction est très en retard. On sacrifie le plus
-            # ancien segment en attente pour rester proche du direct.
             try:
                 self._seg_q.get_nowait()
                 self._seg_q.task_done()
@@ -154,7 +238,7 @@ class Room:
                         await self.notify_broadcaster({"type": "stt", "text": text})
                 if text:
                     await process_final_segment(self, text, manual=item["manual"])
-            except Exception as exc:  # ne jamais tuer le worker
+            except Exception as exc:
                 print(f"[seg_worker {self.code}] {exc!r}")
             finally:
                 self._seg_q.task_done()
@@ -163,23 +247,6 @@ class Room:
         if self._worker and not self._worker.done():
             self._worker.cancel()
         self._worker = None
-
-    # --- comptage ------------------------------------------------------------
-    @property
-    def listener_count(self) -> int:
-        return sum(len(s) for s in self.listeners.values())
-
-    def lang_breakdown(self) -> dict[str, int]:
-        return {k: len(v) for k, v in self.listeners.items() if v}
-
-    def active_target_langs(self) -> list[str]:
-        langs = {l for l in self.listeners if self.listeners[l] and l != "ar"}
-        langs.update(self.default_langs)
-        langs.discard("ar")
-        return sorted(langs)
-
-    def touch(self):
-        self.last_activity = time.time()
 
     # --- envoi -------------------------------------------------------------
     async def send_to(self, ws: WebSocket, payload: dict):
@@ -216,9 +283,12 @@ class Room:
 
     # --- gestion des connexions -----------------------------------------
     async def add_listener(self, ws: WebSocket, lang: str):
+        self.total_joins += 1
+        self.note_peak()
         self.listeners.setdefault(lang, set()).add(ws)
         self.ws_lang[ws] = lang
         self.touch()
+        self.mark_dirty()
         await self.push_stats()
 
     async def change_lang(self, ws: WebSocket, lang: str):
@@ -230,6 +300,7 @@ class Room:
         self.listeners.setdefault(lang, set()).add(ws)
         self.ws_lang[ws] = lang
         self.touch()
+        self.mark_dirty()
         await self.push_stats()
 
     async def drop_listener(self, ws: WebSocket):
@@ -242,7 +313,57 @@ class Room:
             await ws.close()
         except Exception:
             pass
+        self.mark_dirty()
         await self.push_stats()
+
+    # --- statistiques live ---------------------------------------------------
+    def note_peak(self):
+        n = self.listener_count
+        if n > self.peak_listeners:
+            self.peak_listeners = n
+            self.peak_at = time.time()
+
+    async def start_stats(self):
+        self.stop_stats()
+        self.stats_task = asyncio.create_task(self._stats_sampler())
+
+    def stop_stats(self):
+        if self.stats_task and not self.stats_task.done():
+            self.stats_task.cancel()
+        self.stats_task = None
+
+    async def _stats_sampler(self):
+        try:
+            while True:
+                self.note_peak()
+                self.stats_series.append({
+                    "t": int(time.time()),
+                    "n": self.listener_count,
+                    "langs": self.lang_breakdown(),
+                })
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            pass
+
+    def stats_summary(self) -> dict:
+        live_min = 0.0
+        if self.live_started_at:
+            live_min = round(max(0.0, time.time() - self.live_started_at) / 60.0, 1)
+        return {
+            "status": self.status,
+            "live_minutes": live_min,
+            "listeners_now": self.listener_count,
+            "peak_listeners": self.peak_listeners,
+            "peak_at": self.peak_at,
+            "total_joins": self.total_joins,
+            "seq": self.seq,
+            "dropped_segments": self.dropped_segments,
+            "per_language": self.lang_breakdown(),
+            "series": [
+                {"t": p["t"], "n": p["n"], "langs": p["langs"]}
+                for p in self.stats_series
+            ],
+        }
 
     def history_for(self, lang: str, limit: int = 15) -> list[dict]:
         items = list(self.history)[-limit:]
@@ -292,17 +413,54 @@ def _phrase_payload(rec: dict, lang: str) -> dict:
 ROOMS: dict[str, Room] = {}
 
 
+async def _load_rooms_from_redis() -> int:
+    """Load all active rooms from Redis on startup."""
+    loaded = 0
+    codes = await redis_store.get_all_room_codes()
+    for code in codes:
+        if code in ROOMS:
+            continue
+        data = await redis_store.load_room(code)
+        if data:
+            # Load history
+            history = await redis_store.load_history(code)
+            room = Room(code, from_redis=data)
+            room.history = deque(history, maxlen=MAX_HISTORY)
+            ROOMS[code] = room
+            loaded += 1
+    return loaded
+
+
 def get_room(code: str) -> Room | None:
     return ROOMS.get(code.upper())
 
 
-def _drop_room(code: str) -> None:
+async def get_room_or_load(code: str) -> Room | None:
+    """Get room from memory or load from Redis."""
+    code = code.upper()
+    if code in ROOMS:
+        return ROOMS[code]
+    # Try loading from Redis
+    data = await redis_store.load_room(code)
+    if data:
+        history = await redis_store.load_history(code)
+        room = Room(code, from_redis=data)
+        room.history = deque(history, maxlen=MAX_HISTORY)
+        ROOMS[code] = room
+        return room
+    return None
+
+
+async def _drop_room(code: str) -> None:
     room = ROOMS.pop(code, None)
     if room:
         room.stop_worker()
+    await redis_store.delete_room(code)
+    await redis_pubsub.unsubscribe_room(code)
+    await redis_pubsub.broadcast_room_deleted(code)
 
 
-def _purge_stale(now: float | None = None) -> int:
+async def _purge_stale(now: float | None = None) -> int:
     """Retire les rooms inactives (jamais démarrées, ou sans personne depuis longtemps)."""
     now = now or time.time()
     removed = 0
@@ -313,14 +471,14 @@ def _purge_stale(now: float | None = None) -> int:
         idle_never_started = room.status == "idle" and now - room.created_at > IDLE_ROOM_TTL
         long_inactive = now - room.last_activity > SESSION_TTL
         if idle_never_started or long_inactive:
-            _drop_room(code)
+            await _drop_room(code)
             removed += 1
     return removed
 
 
-def create_room() -> Room:
+async def create_room() -> Room:
     if len(ROOMS) >= MAX_ROOMS:
-        _purge_stale()
+        await _purge_stale()
     if len(ROOMS) >= MAX_ROOMS:
         raise HTTPException(503, "Trop de sessions actives, réessayez plus tard")
     for _ in range(20):
@@ -328,16 +486,30 @@ def create_room() -> Room:
         if code not in ROOMS:
             room = Room(code)
             ROOMS[code] = room
+            # Subscribe to room channel and notify other instances
+            asyncio.create_task(redis_pubsub.subscribe_room(code))
+            asyncio.create_task(redis_pubsub.broadcast_room_created(code, {
+                "code": room.code,
+                "token": room.token,
+                "created_at": room.created_at,
+                "mosque_name": room.mosque_name,
+                "default_langs": room.default_langs,
+            }))
             return room
     raise RuntimeError("Impossible de générer un code de session unique")
 
 
 async def _janitor():
-    """Purge périodique des sessions inactives."""
+    """Purge périodique des sessions inactives + sync Redis."""
     while True:
         await asyncio.sleep(120)
         try:
-            _purge_stale()
+            # Purge stale rooms
+            await _purge_stale()
+            # Sync dirty rooms to Redis
+            for room in ROOMS.values():
+                if getattr(room, '_redis_dirty', False):
+                    await room._sync_to_redis()
         except Exception as exc:
             print(f"[janitor] {exc!r}")
 
@@ -386,7 +558,9 @@ async def process_final_segment(room: Room, arabic_text: str, *, manual: bool = 
         }
         _fill_quran_ref(rec)
     room.history.append(rec)
+    room.mark_dirty()
     await _broadcast_record(room, rec, manual=manual)
+    await room._sync_to_redis()
 
 
 def _fill_quran_ref(rec: dict) -> None:
@@ -430,7 +604,11 @@ async def recorrect_segment(room: Room, seq: int, arabic_text: str):
         _fill_quran_ref(rec)
     rec["corrected"] = True
     rec["ts"] = int(time.time() * 1000)
+    room.mark_dirty()
     await _broadcast_record(room, rec, corrected=True)
+    await room._sync_to_redis()
+    # Also update the specific record in Redis
+    await redis_store.update_history_record(room.code, seq, rec)
 
 
 async def _broadcast_record(room: Room, rec: dict, *, manual: bool = False,
@@ -439,6 +617,9 @@ async def _broadcast_record(room: Room, rec: dict, *, manual: bool = False,
         payload = _phrase_payload(rec, lang)
         payload["corrected"] = corrected or rec.get("corrected", False)
         await room.broadcast_lang(lang, payload)
+
+    # Publish to Redis Pub/Sub for other instances
+    await redis_pubsub.broadcast_segment(room.code, rec)
 
     _pref = (room.default_langs[0] if room.default_langs else "fr")
     _preview = rec["translations"].get(_pref) or next(
@@ -460,27 +641,193 @@ async def _broadcast_record(room: Room, rec: dict, *, manual: bool = False,
 
 
 # --------------------------------------------------------------------------- #
+# Redis Pub/Sub handlers for horizontal scaling
+# --------------------------------------------------------------------------- #
+
+
+async def _handle_pubsub_segment(data: dict):
+    """Handle incoming segment from another instance."""
+    code = data.get("code")
+    segment = data.get("segment")
+    if not code or not segment:
+        return
+    room = get_room(code)
+    if room:
+        for lang in list(room.listeners.keys()):
+            payload = _phrase_payload(segment, lang)
+            payload["corrected"] = segment.get("corrected", False)
+            await room.broadcast_lang(lang, payload)
+
+
+async def _handle_pubsub_interim(data: dict):
+    """Handle incoming interim text from another instance."""
+    code = data.get("code")
+    arabic = data.get("arabic")
+    if not code or not arabic:
+        return
+    room = get_room(code)
+    if room:
+        await room.broadcast_all({"type": "interim", "arabic": arabic})
+
+
+async def _handle_pubsub_session_status(data: dict):
+    """Handle session status change from another instance."""
+    code = data.get("code")
+    status = data.get("status")
+    if not code or not status:
+        return
+    room = get_room(code)
+    if room:
+        room.status = status
+        await room.broadcast_all({"type": "session", "status": status})
+
+
+async def _handle_pubsub_listener_change(data: dict):
+    """Handle listener count change from another instance."""
+    code = data.get("code")
+    lang = data.get("lang")
+    count = data.get("count")
+    if not code or lang is None or count is None:
+        return
+    room = get_room(code)
+    if room:
+        await room.push_stats()
+
+
+async def _handle_pubsub_config_update(data: dict):
+    """Handle config update from another instance."""
+    code = data.get("code")
+    glossary = data.get("glossary")
+    target_langs = data.get("target_langs")
+    if not code:
+        return
+    room = get_room(code)
+    if room:
+        if glossary is not None:
+            room.glossary = glossary
+        if target_langs is not None:
+            room.default_langs = target_langs
+        room.mark_dirty()
+
+
+async def _handle_pubsub_correction(data: dict):
+    """Handle segment correction from another instance."""
+    code = data.get("code")
+    seq = data.get("seq")
+    segment = data.get("segment")
+    if not code or seq is None or not segment:
+        return
+    room = get_room(code)
+    if room:
+        for i, rec in enumerate(room.history):
+            if rec.get("seq") == seq:
+                room.history[i] = segment
+                break
+        for lang in list(room.listeners.keys()):
+            payload = _phrase_payload(segment, lang)
+            payload["corrected"] = True
+            await room.broadcast_lang(lang, payload)
+
+
+async def _handle_pubsub_room_created(data: dict):
+    """Handle room created on another instance."""
+    code = data.get("code")
+    if not code:
+        return
+    await redis_pubsub.subscribe_room(code)
+
+
+async def _handle_pubsub_room_deleted(data: dict):
+    """Handle room deleted on another instance."""
+    code = data.get("code")
+    if not code:
+        return
+    await redis_pubsub.unsubscribe_room(code)
+
+
+# --------------------------------------------------------------------------- #
 # Application FastAPI
 # --------------------------------------------------------------------------- #
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Load rooms from Redis on startup
+    loaded = await _load_rooms_from_redis()
+    if loaded:
+        print(f"[startup] Loaded {loaded} rooms from Redis")
+    
+    # Start Redis Pub/Sub subscriber for horizontal scaling
+    await redis_pubsub.start_subscriber()
+    redis_pubsub.register_handler("segment", _handle_pubsub_segment)
+    redis_pubsub.register_handler("interim", _handle_pubsub_interim)
+    redis_pubsub.register_handler("session_status", _handle_pubsub_session_status)
+    redis_pubsub.register_handler("listener_change", _handle_pubsub_listener_change)
+    redis_pubsub.register_handler("config_update", _handle_pubsub_config_update)
+    redis_pubsub.register_handler("correction", _handle_pubsub_correction)
+    redis_pubsub.register_handler("room_created", _handle_pubsub_room_created)
+    redis_pubsub.register_handler("room_deleted", _handle_pubsub_room_deleted)
+    
+    # Subscribe to existing rooms' channels
+    for code in ROOMS.keys():
+        await redis_pubsub.subscribe_room(code)
+    
     task = asyncio.create_task(_janitor())
     yield
     task.cancel()
     for room in list(ROOMS.values()):
         room.stop_worker()
+        await room._sync_to_redis()
     await translator.aclose()
+    await redis_store.close_pool()
+    await redis_pubsub.close_pubsub()
 
+
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "*"
+).split(",")
 
 app = FastAPI(title="Khutbah Live Translation", version="1.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+class SecurityHeadersMiddleware:
+    """Add security headers to all responses."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = dict(message.setdefault("headers", []))
+                b = lambda s: s.encode("utf-8")
+                headers.update({
+                    b("x-content-type-options"): b("nosniff"),
+                    b("x-frame-options"): b("DENY"),
+                    b("x-xss-protection"): b("1; mode=block"),
+                    b("referrer-policy"): b("strict-origin-when-cross-origin"),
+                    b("permissions-policy"): b("camera=(), microphone=()"),
+                })
+                message["headers"] = list(headers.items())
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(logging_config.LoggingMiddleware)
 
 
 # ----------------------------- REST --------------------------------------- #
@@ -488,6 +835,11 @@ app.add_middleware(
 import socket
 
 from starlette.requests import Request  # noqa: E402
+
+from schemas import (  # noqa: E402
+    SessionCreateRequest, SessionResponse, HealthResponse, LanguagesResponse, ReportRequest,
+    AskRequest,
+)
 
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]", ""}
 
@@ -541,24 +893,36 @@ def base_url(request: Request) -> str:
 @app.get("/healthz")
 async def healthz():
     live = sum(1 for r in ROOMS.values() if r.status == "live")
-    return {
-        "ok": True,
-        "rooms": len(ROOMS),
-        "rooms_live": live,
-        "listeners": sum(r.listener_count for r in ROOMS.values()),
-        "segments_total": sum(r.seq for r in ROOMS.values()),
-        "segments_dropped": sum(r.dropped_segments for r in ROOMS.values()),
-        "gemini": translator.has_api_key(),
-        "translate_providers": translator.TRANSLATE_PROVIDERS,
-        "translate_last_error": translator.last_error() or None,
-        "translate_last_provider": translator.last_provider() or None,
-        "model": translator.MODEL,
-    }
+    redis_health = await redis_store.redis_health()
+    return HealthResponse(
+        ok=True,
+        rooms=len(ROOMS),
+        rooms_live=live,
+        rooms_idle=sum(1 for r in ROOMS.values() if r.status == "idle"),
+        listeners=sum(r.listener_count for r in ROOMS.values()),
+        segments_total=sum(r.seq for r in ROOMS.values()),
+        segments_dropped=sum(r.dropped_segments for r in ROOMS.values()),
+        translate_last_error=translator.last_error() or None,
+        translate_last_provider=translator.last_provider() or None,
+        model=translator.MODEL,
+        redis=redis_health,
+    )
+
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Prometheus metrics endpoint."""
+    from main import ROOMS
+    metrics.update_room_metrics(ROOMS)
+    output, headers = await metrics.metrics_endpoint(None)
+    return Response(content=output, media_type=metrics.CONTENT_TYPE_LATEST)
 
 
 @app.get("/api/languages")
 async def api_languages():
-    return {"languages": [{"code": c, "name": n} for c, n in SUPPORTED_LANGUAGES.items()]}
+    return LanguagesResponse(
+        languages=[{"code": c, "name": n} for c, n in SUPPORTED_LANGUAGES.items()]
+    )
 
 
 # Rate limiting mémoire : créations de session par IP (fenêtre glissante).
@@ -579,7 +943,7 @@ def _rate_ok(ip: str) -> bool:
 
 
 @app.post("/api/session")
-async def api_create_session(request: Request):
+async def api_create_session(request: Request, body: SessionCreateRequest):
     if not translator.has_api_key() and not ALLOW_NO_API_KEY:
         raise HTTPException(503, "GEMINI_API_KEY non configurée")
     ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
@@ -587,21 +951,12 @@ async def api_create_session(request: Request):
     if not _rate_ok(ip):
         raise HTTPException(429, "Trop de sessions créées, réessayez dans une minute")
 
-    body = {}
-    try:
-        raw = await request.body()
-        if raw:
-            body = json.loads(raw)
-    except (ValueError, json.JSONDecodeError):
-        body = {}
-
-    room = create_room()
-    room.glossary = str(body.get("glossary") or "").strip()[:4000]
-    room.mosque_name = str(body.get("mosque_name") or "").strip()[:120]
-    langs = body.get("target_langs") or []
-    if isinstance(langs, list):
+    room = await create_room()
+    room.glossary = body.glossary
+    room.mosque_name = body.mosque_name
+    if body.target_langs:
         room.default_langs = [
-            l for l in langs if l in SUPPORTED_LANGUAGES and l != "ar"
+            l for l in body.target_langs if l in SUPPORTED_LANGUAGES and l != "ar"
         ] or list(DEFAULT_TARGET_LANGS)
 
     base = base_url(request)
@@ -612,7 +967,7 @@ async def api_create_session(request: Request):
         "broadcaster_token": room.token,
         "created_at": room.created_at,
         "join_url": join_url,
-        "shareable": _bh not in _LOCAL_HOSTS,   # False = lien inutilisable hors de cette machine
+        "shareable": _bh not in _LOCAL_HOSTS,
         "gemini": translator.has_api_key(),
         "mosque_name": room.mosque_name,
         "target_langs": room.default_langs,
@@ -621,7 +976,7 @@ async def api_create_session(request: Request):
 
 @app.get("/api/session/{code}")
 async def api_get_session(code: str):
-    room = get_room(code)
+    room = await get_room_or_load(code)
     if not room:
         raise HTTPException(404, "Session introuvable ou terminée")
     return {
@@ -637,7 +992,7 @@ async def api_get_session(code: str):
 
 @app.get("/api/session/{code}/qr.png")
 async def api_session_qr(code: str, request: Request):
-    room = get_room(code)
+    room = await get_room_or_load(code)
     if not room:
         raise HTTPException(404, "Session introuvable")
     import qrcode
@@ -648,6 +1003,92 @@ async def api_session_qr(code: str, request: Request):
     img.save(buf, format="PNG")
     return Response(buf.getvalue(), media_type="image/png",
                     headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/session/{code}/report")
+async def api_session_report(code: str, body: ReportRequest,
+                             token: str = ""):
+    """Rapport automatique de la session (résumé de la khutbah).
+
+    Génération restreinte : token diffuseur valide, OU session déjà close
+    (les fidèles peuvent alors récupérer le rapport à la fin du prêche).
+    """
+    room = await get_room_or_load(code)
+    if not room:
+        raise HTTPException(404, "Session introuvable ou terminée")
+    if not (room.status == "stopped" or (token and token == room.token)):
+        raise HTTPException(403, "Token diffuseur requis")
+
+    transcript = body.transcript or list(room.history)
+    segs: list[dict] = []
+    for r in transcript:
+        if not isinstance(r, dict) or not str(r.get("arabic") or "").strip():
+            continue
+        segs.append({
+            "arabic": str(r["arabic"]).strip()[:4000],
+            "ts": r.get("ts"),
+            "is_quran": bool(r.get("is_quran")),
+            "quran_ref": r.get("quran_ref"),
+            "is_hadith": bool(r.get("is_hadith")),
+        })
+    if len(segs) < 2:
+        raise HTTPException(400, "Pas assez de segments pour un rapport")
+
+    cached = getattr(room, "_report_cache", None)
+    if cached and cached[0] == body.lang and cached[1] == len(segs):
+        return cached[2]
+
+    if not translator.has_api_key():
+        raise HTTPException(503, "Aucun fournisseur d'IA configuré")
+
+    report = await translator.summarize_session(
+        segs, lang=body.lang, mosque=room.mosque_name, glossary=room.glossary
+    )
+    if report is None:
+        err = translator.last_error() or "erreur inconnue"
+        raise HTTPException(502, f"Génération du rapport impossible ({err})")
+
+    room._report_cache = (body.lang, len(segs), report)
+    return report
+
+
+@app.post("/api/session/{code}/ask")
+async def api_session_ask(code: str, body: AskRequest, request: Request):
+    """Ask My Mosque : réponse IA à un fidèle, ancrée sur la session en cours.
+
+    Cost-control : rate limit par IP (comme la création de session) et question bornée.
+    """
+    room = await get_room_or_load(code)
+    if not room:
+        raise HTTPException(404, "Session introuvable ou terminée")
+    ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+          or (request.client.host if request.client else "?"))
+    if not _rate_ok(ip):
+        raise HTTPException(429, "Trop de questions, réessayez dans une minute")
+
+    question = (body.question or "").strip()
+    if len(question) < 3:
+        raise HTTPException(400, "Question trop courte")
+    if not translator.has_api_key():
+        raise HTTPException(503, "Aucun fournisseur d'IA configuré")
+
+    answer = await translator.ask_question(
+        question, list(room.history), lang=body.lang,
+        mosque=room.mosque_name, glossary=room.glossary,
+    )
+    if answer is None:
+        err = translator.last_error() or "erreur inconnue"
+        raise HTTPException(502, f"Réponse impossible ({err})")
+    return answer
+
+
+@app.get("/api/session/{code}/stats")
+async def api_session_stats(code: str):
+    """Khutbah Live Intelligence : statistiques de diffusion (publiques, agrégées)."""
+    room = await get_room_or_load(code)
+    if not room:
+        raise HTTPException(404, "Session introuvable ou terminée")
+    return room.stats_summary()
 
 
 # ----------------------------- Frontend / PWA ---------------------------- #
@@ -747,7 +1188,7 @@ async def api_icon(size: int):
 
 @app.websocket("/ws/broadcast/{code}")
 async def ws_broadcast(ws: WebSocket, code: str, token: str = Query("")):
-    room = get_room(code)
+    room = await get_room_or_load(code)
     if not room or token != room.token:
         await ws.close(code=4403)
         return
@@ -760,7 +1201,10 @@ async def ws_broadcast(ws: WebSocket, code: str, token: str = Query("")):
         except Exception:
             pass
     room.broadcaster = ws
-    room.status = "live" if room.status in ("idle", "stopped") else room.status
+    if room.status in ("idle", "stopped"):
+        room.status = "live"
+        room.live_started_at = time.time()
+    await room.start_stats()
     room.touch()
     await ws.send_text(json.dumps({
         "type": "hello", "code": room.code, "status": room.status,
@@ -791,6 +1235,7 @@ async def ws_broadcast(ws: WebSocket, code: str, token: str = Query("")):
                 else:
                     # Intérimaire : arabe live poussé à tous, sans traduction.
                     await room.broadcast_all({"type": "interim", "arabic": text})
+                    await redis_pubsub.broadcast_interim(room.code, text)
 
             elif mtype == "audio":
                 b64 = msg.get("data") or ""
@@ -838,6 +1283,7 @@ async def ws_broadcast(ws: WebSocket, code: str, token: str = Query("")):
                 elif action == "stop":
                     room.status = "stopped"
                 await room.broadcast_all({"type": "session", "status": room.status})
+                await redis_pubsub.broadcast_session_status(room.code, room.status)
                 await room.push_stats()
 
             elif mtype == "level":
@@ -854,11 +1300,13 @@ async def ws_broadcast(ws: WebSocket, code: str, token: str = Query("")):
     except Exception as exc:
         print(f"[ws_broadcast] {exc!r}")
     finally:
+        room.stop_stats()
         if room.broadcaster is ws:
             room.broadcaster = None
             room.status = "paused" if room.status == "live" else room.status
             await room.broadcast_all({"type": "session", "status": room.status,
                                       "broadcaster_gone": True})
+            await redis_pubsub.broadcast_session_status(room.code, room.status, broadcaster_gone=True)
 
 
 # ----------------------------- WebSocket : auditeur -------------------- #
@@ -867,7 +1315,7 @@ async def ws_broadcast(ws: WebSocket, code: str, token: str = Query("")):
 @app.websocket("/ws/listen/{code}")
 async def ws_listen(ws: WebSocket, code: str, lang: str = Query("fr"),
                     since: int = Query(0)):
-    room = get_room(code)
+    room = await get_room_or_load(code)
     if not room:
         await ws.close(code=4404)
         return

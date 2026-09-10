@@ -1,26 +1,22 @@
-# Blueprint Render — déploiement du prêche (khutbah) en direct.
-# Une seule instance persistante (WebSockets longs + état en mémoire).
-# Alternative équivalente : imposer ce Dockerfile sur Railway / Fly.io / un VPS.
+# Blueprint Render — Mosqué Digital
+# Backend FastAPI (WebSockets + Khutbah en direct) + Frontend PWA statique
+# Le Dockerfile construit le frontend avec Vite et le servit avec le backend.
 services:
   - type: web
-    name: khutbah-live
+    name: mosque-digitale
     runtime: docker
     plan: free
     autoDeploy: true
     healthCheckPath: /healthz
     dockerfilePath: ./Dockerfile
     envVars:
-      # Secret réglé dans le dashboard Render (jamais commité) :
       - key: GEMINI_API_KEY
         sync: false
-      # Modèle Gemini. Le quota gratuit de gemini-2.5-flash est vite atteint ;
-      # gemini-2.5-flash-lite a un quota gratuit plus large. Surchargeable dans
-      # le dashboard Render (Environment).
       - key: GEMINI_MODEL
         value: gemini-2.5-flash-lite
-      # Facultatif : langues traduites par défaut (ex: "fr,en,nl")
       - key: DEFAULT_TARGET_LANGS
         sync: false
-      # Facultatif : URL publique utilisée pour les liens/QR
       - key: PUBLIC_BASE_URL
+        sync: false
+      - key: REDIS_URL
         sync: false

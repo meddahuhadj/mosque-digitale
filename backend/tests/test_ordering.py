@@ -3,6 +3,7 @@ la traduction du segment N+1 revient avant celle de N."""
 import asyncio
 import json
 
+import pytest
 import main
 
 
@@ -67,11 +68,12 @@ def test_max_rooms_returns_503(app_client, monkeypatch):
     assert r.status_code == 503
 
 
-def test_purge_stale_removes_idle_never_started(app_client, monkeypatch):
+@pytest.mark.asyncio
+async def test_purge_stale_removes_idle_never_started(app_client, monkeypatch):
     main.ROOMS.clear()
-    r = main.create_room()
+    r = await main.create_room()
     r.created_at -= main.IDLE_ROOM_TTL + 10   # « créée il y a longtemps », jamais démarrée
-    assert main._purge_stale() == 1
+    assert await main._purge_stale() == 1
     assert r.code not in main.ROOMS
 
 
