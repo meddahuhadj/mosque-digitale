@@ -1154,6 +1154,25 @@ async def service_worker():
     return Response("", media_type="application/javascript")
 
 
+@app.get("/modules/{path:path}")
+async def serve_modules(path: str):
+    p = (FRONTEND_DIR / "modules" / path).resolve()
+    if FRONTEND_DIR not in p.parents or not p.is_file():
+        raise HTTPException(404, "Module introuvable")
+    media = "application/javascript" if p.suffix == ".js" else "application/json"
+    return FileResponse(p, media_type=media,
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/lang/{path:path}")
+async def serve_lang(path: str):
+    p = (FRONTEND_DIR / "lang" / path).resolve()
+    if FRONTEND_DIR not in p.parents or not p.is_file():
+        raise HTTPException(404, "Langue introuvable")
+    return FileResponse(p, media_type="application/json",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
 _ICON_CACHE: dict[int, bytes] = {}
 
 

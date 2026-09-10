@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend/ ./backend/
 COPY dist/ ./frontend/
+COPY frontend/mosque/modules/ ./frontend/modules/
+COPY frontend/mosque/lang/ ./frontend/lang/
 
 # Create non-root user
 RUN useradd -m -u 1000 app && chown -R app:app /app
