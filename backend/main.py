@@ -1173,6 +1173,16 @@ async def serve_lang(path: str):
                         headers={"Cache-Control": "public, max-age=3600"})
 
 
+@app.get("/core/{path:path}")
+async def serve_core(path: str):
+    p = (FRONTEND_DIR / "core" / path).resolve()
+    if FRONTEND_DIR not in p.parents or not p.is_file():
+        raise HTTPException(404, "Core introuvable")
+    media = "application/javascript" if p.suffix == ".js" else "text/plain"
+    return FileResponse(p, media_type=media,
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
 _ICON_CACHE: dict[int, bytes] = {}
 
 

@@ -16,6 +16,7 @@ COPY backend/ ./backend/
 COPY dist/ ./frontend/
 COPY frontend/mosque/modules/ ./frontend/modules/
 COPY frontend/mosque/lang/ ./frontend/lang/
+COPY frontend/mosque/core/ ./frontend/core/
 
 # Create non-root user
 RUN useradd -m -u 1000 app && chown -R app:app /app
