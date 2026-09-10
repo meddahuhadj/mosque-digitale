@@ -54,11 +54,14 @@ import logging_config
 # --------------------------------------------------------------------------- #
 
 FRONTEND_DIR = (Path(__file__).resolve().parent.parent / "frontend")
-DIST_DIR = FRONTEND_DIR / "dist"
-# Use dist/ if it exists (Vite build), otherwise use frontend/ directly
-if (DIST_DIR / "index.html").exists():
-    FRONTEND_DIR = DIST_DIR
 INDEX_HTML = FRONTEND_DIR / "index.html"
+# In Docker, frontend files are directly in /app/frontend (copied from dist/)
+# Locally, they may be in frontend/dist/ (Vite build output)
+if not INDEX_HTML.exists():
+    DIST_DIR = FRONTEND_DIR / "dist"
+    if (DIST_DIR / "index.html").exists():
+        FRONTEND_DIR = DIST_DIR
+        INDEX_HTML = FRONTEND_DIR / "index.html"
 
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
 DEFAULT_TARGET_LANGS = [

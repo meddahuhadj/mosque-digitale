@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY backend/ ./backend/
-COPY frontend/dist/ ./frontend/dist/
+COPY dist/ ./frontend/
 
 # Create non-root user
 RUN useradd -m -u 1000 app && chown -R app:app /app
