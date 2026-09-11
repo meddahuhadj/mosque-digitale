@@ -14,9 +14,17 @@ export async function renderAnnouncements(params) {
     </div>
   `);
 
-  if (mosqueId) {
+  let actualMosqueId = mosqueId || null;
+  if (!actualMosqueId) {
     try {
-      const items = await api(`/api/announcements/${mosqueId}`, { auth: false });
+      const mosques = await api("/api/mosques", { auth: false });
+      actualMosqueId = mosques?.[0]?.id || null;
+    } catch { actualMosqueId = null; }
+  }
+
+  if (actualMosqueId) {
+    try {
+      const items = await api(`/api/announcements/${actualMosqueId}`, { auth: false });
       renderAnnouncementList(items);
     } catch (err) {
       document.getElementById("announcements-list").innerHTML =

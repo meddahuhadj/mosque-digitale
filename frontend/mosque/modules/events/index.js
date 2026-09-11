@@ -19,9 +19,17 @@ export async function renderEvents(params) {
     </div>
   `);
 
-  if (mosqueId) {
+  let actualMosqueId = mosqueId || null;
+  if (!actualMosqueId) {
     try {
-      const items = await api(`/api/events/${mosqueId}`, { auth: false });
+      const mosques = await api("/api/mosques", { auth: false });
+      actualMosqueId = mosques?.[0]?.id || null;
+    } catch { actualMosqueId = null; }
+  }
+
+  if (actualMosqueId) {
+    try {
+      const items = await api(`/api/events/${actualMosqueId}`, { auth: false });
       renderEventList(items);
     } catch {
       showEmpty();
@@ -44,18 +52,28 @@ function renderEventList(items) {
 
   if (!items?.length) { showEmpty(); return; }
 
-  el.innerHTML = items.map(ev => `
+  el.innerHTML = items.map(ev => {
+    let when = "";
+    if (ev.startTime) {
+      when = new Date(ev.startTime).toLocaleDateString() + " " + new Date(ev.startTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    } else if (ev.date) {
+      when = new Date(ev.date + (ev.time ? "T" + ev.time : "")).toLocaleDateString() + (ev.time ? " à " + ev.time : "");
+    } else if (ev.time) {
+      when = "à " + ev.time;
+    }
+    return `
     <div class="card" style="padding:16px; display:flex; gap:16px; align-items:start;">
       <div style="font-size:2em; flex-shrink:0;">${CATEGORY_ICONS[ev.category] || "📅"}</div>
       <div style="flex:1;">
         <div style="font-weight:600;">${ev.title}</div>
         ${ev.description ? `<div style="color:var(--muted); margin-top:4px;">${ev.description}</div>` : ""}
         <div style="font-size:0.85em; color:var(--accent); margin-top:8px;">
-          📅 ${new Date(ev.startTime).toLocaleDateString()} ${new Date(ev.startTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+          📅 ${when}
           ${ev.location ? ` · 📍 ${ev.location}` : ""}
           ${ev.speaker ? ` · 🎤 ${ev.speaker}` : ""}
         </div>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 }

@@ -1,6 +1,6 @@
 // ── Imam Module ────────────────────────────────────────────────────────
 
-import { api, isAuthenticated } from "../../core/api.js";
+import { api, isAuthenticated, API_BASE } from "../../core/api.js";
 import { getSocket } from "../../core/socket.js";
 import { t } from "../../core/i18n.js";
 import { renderMain, toast } from "../../core/components.js";
@@ -56,9 +56,9 @@ async function renderImamDashboard() {
   document.getElementById("start-khutbah").onclick = async () => {
     const topic = document.getElementById("imam-topic").value.trim();
     try {
-      const data = await api("/api/sessions", {
+      const data = await api("/api/session", {
         method: "POST",
-        body: { topic, languages: ["fr", "en"] },
+        body: { mosque_name: topic, target_langs: ["fr", "en"] },
       });
       toast(`${t("session_created", "Session créée")}: ${data.code}`, "success");
       location.hash = `#/imam/${data.code}`;
@@ -101,6 +101,12 @@ async function renderImamControl(code) {
       <span style="margin-left:auto; font-size:0.85em; color:var(--muted);" id="imam-status">⏳</span>
     </div>
 
+    <div class="card" style="text-align:center;">
+      <h3 class="card-header" style="justify-content:center;">📱 ${t("qr_session", "QR Code de la session")}</h3>
+      <img src="${API_BASE}/api/session/${code}/qr.png" style="width:200px; margin:16px auto; border-radius:12px; background:#fff; padding:8px;" id="imam-qr-img" />
+      <div style="font-size:0.85em; color:var(--muted); word-break:break-all;" id="join-url"></div>
+    </div>
+
     <div class="card">
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
         <button class="btn btn-primary" id="btn-pause">⏸ ${t("pause", "Pause")}</button>
@@ -128,6 +134,15 @@ async function renderImamControl(code) {
   `);
 
   const socket = getSocket("/khutbah");
+
+  try {
+    const session = await api(`/api/session/${code}`);
+    const joinUrlEl = document.getElementById("join-url");
+    if (joinUrlEl) joinUrlEl.textContent = session.join_url || `${window.location.origin}/#/khutbah/${code}`;
+  } catch {
+    const joinUrlEl = document.getElementById("join-url");
+    if (joinUrlEl) joinUrlEl.textContent = `${window.location.origin}/#/khutbah/${code}`;
+  }
 
   socket.on("connect", () => {
     document.getElementById("imam-status").textContent = "🟢 " + t("connected", "Connecté");

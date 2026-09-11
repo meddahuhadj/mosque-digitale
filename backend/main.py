@@ -832,6 +832,10 @@ class SecurityHeadersMiddleware:
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(logging_config.LoggingMiddleware)
 
+# Content API router (auth, quran, prayer times, mosques, announcements, events, admin)
+from content import router as content_router  # noqa: E402
+app.include_router(content_router)
+
 
 # ----------------------------- REST --------------------------------------- #
 
@@ -1092,6 +1096,63 @@ async def api_session_stats(code: str):
     if not room:
         raise HTTPException(404, "Session introuvable ou terminée")
     return room.stats_summary()
+
+
+@app.post("/api/ai/assistant/plan")
+async def api_ai_plan(body: AskRequest, request: Request):
+    """Assistant imam : génère un plan structuré de khutbah sur un sujet donné.
+
+    Retourne {topic, introduction, mainPoints[], references[], conclusion, warnings[]}.
+    """
+    topic = (body.question or "").strip()
+    if len(topic) < 3:
+        raise HTTPException(400, "Sujet trop court")
+    ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+          or (request.client.host if request.client else "?"))
+    if not _rate_ok(ip):
+        raise HTTPException(429, "Trop de requêtes, réessayez dans une minute")
+    if not translator.has_api_key():
+        raise HTTPException(503, "Aucun fournisseur d'IA configuré")
+
+    answer = await translator.ask_question(
+        f"Génère un plan structuré de khutbah (sermon) sur le sujet : « {topic} ». "
+        "Réponds en JSON avec les clés : introduction, mainPoints (liste de 3 à 5 points), "
+        "references (versets coraniques et hadiths), conclusion, warnings (pièges à éviter). "
+        "Réponds en français.", [], lang="fr",
+    )
+    if answer is None:
+        err = translator.last_error() or "erreur inconnue"
+        raise HTTPException(502, f"Plan impossible ({err})")
+
+    raw = answer.get("answer") or ""
+    data = _parse_plan_json(raw)
+    data.setdefault("topic", topic)
+    # Normaliser les champs attendus par le frontend
+    data.setdefault("introduction", "")
+    data.setdefault("mainPoints", [])
+    data.setdefault("references", [])
+    data.setdefault("conclusion", "")
+    data.setdefault("warnings", [])
+    return data
+
+
+def _parse_plan_json(raw: str) -> dict:
+    """Extrait un dict depuis la réponse IA (JSON entre balises ou brut)."""
+    import json as _json
+    text = raw.strip()
+    # Tente d'isoler un bloc JSON
+    import re as _re
+    m = _re.search(r"\{.*\}", text, _re.S)
+    if m:
+        try:
+            parsed = _json.loads(m.group(0))
+            if isinstance(parsed, dict):
+                return parsed
+        except _json.JSONDecodeError:
+            pass
+    # Fallback : structure simple à partir du texte brut
+    points = [ln.strip("•- ") for ln in text.splitlines() if ln.strip().lstrip("•- ")]
+    return {"introduction": points[:1], "mainPoints": points[1:6]}
 
 
 # ----------------------------- Frontend / PWA ---------------------------- #

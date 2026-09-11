@@ -26,4 +26,11 @@ Thumbs.db
 .pytest_cache/
 backend/data/quran_raw.json
 
+# Runtime data (generated at first start)
+backend/data/users.json
+backend/data/mosques.json
+backend/data/announcements.json
+backend/data/events.json
+backend/data/settings.json
+
 .vercel

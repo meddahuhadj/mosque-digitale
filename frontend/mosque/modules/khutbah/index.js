@@ -3,7 +3,7 @@
 import { getSocket } from "../../core/socket.js";
 import { t } from "../../core/i18n.js";
 import { renderMain, toast } from "../../core/components.js";
-import { isAuthenticated, getAccessToken } from "../../core/api.js";
+import { isAuthenticated, api } from "../../core/api.js";
 
 export async function renderKhutbah(params) {
   const code = params?.code;
@@ -20,7 +20,15 @@ async function renderLobby() {
     <div class="card" style="max-width:500px; margin:20px auto; text-align:center;">
       <h2 class="card-header" style="justify-content:center;">🎙️ ${t("khutbah_live", "Khutbah Live")}</h2>
 
-      <p style="color:var(--muted); margin-bottom:20px;">${t("join_session", "Rejoindre une session en cours")}</p>
+      <div style="background:var(--bg2); border-radius:12px; padding:20px; margin-bottom:16px;">
+        <div style="font-size:1.5em; margin-bottom:8px;">📱</div>
+        <h3 style="margin:0 0 8px;">${t("scan_qr_title", "Scannez le QR Code")}</h3>
+        <p style="color:var(--muted); margin:0; line-height:1.5;">
+          ${t("scan_qr_instructions", "Affichez le QR Code projeté à l'écran de la mosquée. Ouvrez l'appareil photo de votre téléphone et scannez-le pour rejoindre la session automatiquement.")}
+        </p>
+      </div>
+
+      <div style="margin:20px 0; color:var(--muted);">— ${t("or", "ou")} —</div>
 
       <div class="form-group">
         <input type="text" id="session-code" placeholder="${t("session_code", "Code de session")}"
@@ -28,10 +36,6 @@ async function renderLobby() {
       </div>
 
       <button class="btn btn-primary btn-block" id="join-btn">${t("join", "Rejoindre")}</button>
-
-      <div style="margin:20px 0; color:var(--muted);">— ${t("or", "ou")} —</div>
-
-      <button class="btn btn-secondary btn-block" id="scan-btn">📷 ${t("scan_qr", "Scanner le QR Code")}</button>
     </div>
 
     ${isAuthenticated() ? `
@@ -54,10 +58,9 @@ async function renderLobby() {
   if (document.getElementById("start-session")) {
     document.getElementById("start-session").onclick = async () => {
       try {
-        const { api } = await import("../../core/api.js");
-        const data = await api("/api/sessions", {
+        const data = await api("/api/session", {
           method: "POST",
-          body: { languages: ["fr", "en"] },
+          body: { target_langs: ["fr", "en"] },
         });
         toast(`${t("session_created", "Session créée")}: ${data.code}`, "success");
         location.hash = `#/imam/${data.code}`;

@@ -20,8 +20,15 @@ export async function renderPrayer(params) {
   try {
     const date = new Date().toISOString().split("T")[0];
     let data;
-    if (mosqueId) {
-      data = await api(`/api/prayer-times/${mosqueId}?date=${date}`);
+    let actualMosqueId = mosqueId;
+    if (!actualMosqueId) {
+      try {
+        const mosques = await api("/api/mosques", { auth: false });
+        actualMosqueId = mosques?.[0]?.id;
+      } catch { actualMosqueId = null; }
+    }
+    if (actualMosqueId) {
+      data = await api(`/api/prayer-times/${actualMosqueId}?date=${date}`, { auth: false });
     } else {
       // Use calculated times based on browser location
       data = getBrowserPrayerTimes();
