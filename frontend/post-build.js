@@ -26,7 +26,7 @@ if (cssMatches) {
       const cssPath = resolve(distDir, hrefMatch[1]);
       if (existsSync(cssPath)) {
         const css = readFileSync(cssPath, 'utf-8');
-        html = html.replace(match, `<style>${css}</style>`);
+        html = html.replace(match, () => `<style>${css}</style>`);
       }
     }
   }
@@ -41,7 +41,7 @@ if (jsMatches) {
       const jsPath = resolve(distDir, srcMatch[1]);
       if (existsSync(jsPath)) {
         const js = readFileSync(jsPath, 'utf-8');
-        html = html.replace(match, `<script type="module">${js}</script>`);
+        html = html.replace(match, () => `<script type="module">${js}</script>`);
       }
     }
   }
@@ -69,16 +69,17 @@ if (regSwMatch) {
   const regSwPath = resolve(distDir, 'registerSW.js');
   if (existsSync(regSwPath)) {
     const regSwJs = readFileSync(regSwPath, 'utf-8');
-    html = html.replace(regSwMatch[0], `<script>${regSwJs}</script>`);
+    html = html.replace(regSwMatch[0], () => `<script>${regSwJs}</script>`);
   } else {
     html = html.replace(regSwMatch[0], '');
   }
 }
 
 // Remove duplicate HTML that might have been injected
-// (look for second <!DOCTYPE html> or <html lang="fr">)
+// (look for a second <!DOCTYPE html> appearing AFTER the real document end)
+const firstHtmlEnd = html.indexOf('</html>');
 const secondDoctype = html.indexOf('<!DOCTYPE html>', 10);
-if (secondDoctype > 0) {
+if (secondDoctype > 0 && firstHtmlEnd > 0 && secondDoctype > firstHtmlEnd) {
   html = html.substring(0, secondDoctype);
 }
 

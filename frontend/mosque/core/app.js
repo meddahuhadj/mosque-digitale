@@ -8,8 +8,12 @@ import { toast, renderMain, showModal } from "./components.js";
 
 // ── Modules (lazy loaded) ─────────────────────────────────────────────
 
+const moduleLoaders = import.meta.glob("../modules/*/index.js");
+
 async function loadModule(path) {
-  return import(`../modules/${path}.js`);
+  const load = moduleLoaders[`../modules/${path}.js`];
+  if (!load) throw new Error(`Module introuvable: ${path}`);
+  return load();
 }
 
 // ── Page Handlers ──────────────────────────────────────────────────────
