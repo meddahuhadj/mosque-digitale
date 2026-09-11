@@ -570,6 +570,79 @@ async def hadith_warmup():
     await asyncio.gather(_hadith_load("ar"), _hadith_load("fr"), return_exceptions=True)
 
 
+# Titres des 97 livres/chapitres de Sahih al-Bukhari, en français et en arabe.
+# La source (fawazahmed0/hadith-api) ne fournit ces titres qu'en anglais quelle
+# que soit l'édition — ce sont les divisions canoniques, identiques dans toutes
+# les éditions imprimées/numériques, donc fiables à coder en dur ici plutôt que
+# de dépendre d'une traduction absente du jeu de données.
+_HADITH_BOOK_NAMES_FR = {
+    1: "La Révélation", 2: "La Foi (Al-Îmân)", 3: "La Science (Al-'Ilm)",
+    4: "Les Ablutions (Al-Wudû')", 5: "Le Bain rituel (Al-Ghusl)", 6: "Les Menstrues (Al-Hayd)",
+    7: "L'Ablution sèche (At-Tayammum)", 8: "La Prière (As-Salât)", 9: "Les Heures de la prière",
+    10: "L'Appel à la prière (Al-Adhân)", 11: "La Prière du vendredi", 12: "La Prière de la crainte (Salât al-Khawf)",
+    13: "Les Deux Fêtes (Al-'Îdayn)", 14: "La Prière du Witr", 15: "La Prière pour la pluie (Al-Istisqâ')",
+    16: "Les Éclipses", 17: "La Prosternation de récitation", 18: "Le Raccourcissement de la prière (Al-Qasr)",
+    19: "La Prière de nuit (At-Tahajjud)", 20: "Les Mérites de la prière aux mosquées de La Mecque et Médine",
+    21: "Les Gestes pendant la prière", 22: "L'Oubli dans la prière (As-Sahw)", 23: "Les Funérailles (Al-Janâ'iz)",
+    24: "L'Aumône légale (Az-Zakât)", 25: "Le Pèlerinage (Al-Hajj)", 26: "La 'Umra (Petit pèlerinage)",
+    27: "L'Empêchement d'achever le pèlerinage", 28: "La Pénalité de chasse en état de sacralisation",
+    29: "Les Mérites de Médine", 30: "Le Jeûne (As-Siyâm)", 31: "La Prière nocturne du Ramadan (At-Tarâwîh)",
+    32: "Les Mérites de la Nuit du Destin (Laylat al-Qadr)", 33: "La Retraite pieuse (Al-I'tikâf)",
+    34: "Les Ventes et le commerce", 35: "La Vente par avance (As-Salam)", 36: "Le Droit de préemption (Ash-Shuf'a)",
+    37: "Le Louage (Al-Ijâra)", 38: "Le Transfert de dette (Al-Hawâla)", 39: "Le Cautionnement (Al-Kafâla)",
+    40: "Le Mandat et la procuration (Al-Wakâla)", 41: "L'Agriculture", 42: "Le Partage de l'eau",
+    43: "Les Prêts, remboursements, saisie de biens et faillite", 44: "Les Litiges (Al-Khusûmât)",
+    45: "Les Objets trouvés (Al-Luqata)", 46: "Les Injustices (Al-Mazhâlim)", 47: "L'Association (Ash-Shirka)",
+    48: "Le Nantissement (Ar-Rahn)", 49: "L'Affranchissement des esclaves", 50: "L'Affranchissement contractuel (Al-Mukâtab)",
+    51: "Les Dons (Al-Hiba)", 52: "Les Témoins (Ash-Shahâdât)", 53: "La Conciliation (As-Sulh)",
+    54: "Les Clauses et conditions (Ash-Shurût)", 55: "Les Testaments (Al-Wasâyâ)", 56: "Le Combat dans la voie d'Allah (Al-Jihâd)",
+    57: "Le Cinquième du butin (Al-Khums)", 58: "La Capitation et les traités (Al-Jizya)",
+    59: "Le Commencement de la Création", 60: "Les Prophètes", 61: "Les Mérites du Prophète ﷺ et de ses Compagnons",
+    62: "Les Compagnons du Prophète", 63: "Les Mérites des Ansâr (Auxiliaires de Médine)",
+    64: "Les Expéditions militaires du Prophète ﷺ (Al-Maghâzî)", 65: "L'Exégèse du Coran par le Prophète ﷺ",
+    66: "Les Mérites du Coran", 67: "Le Mariage (An-Nikâh)", 68: "Le Divorce (At-Talâq)",
+    69: "L'Entretien de la famille (An-Nafaqât)", 70: "L'Alimentation", 71: "Le Sacrifice de naissance ('Aqîqa)",
+    72: "La Chasse et l'abattage rituel", 73: "Les Sacrifices de l'Aïd al-Adha (Al-Adâhî)", 74: "Les Boissons",
+    75: "Les Malades", 76: "La Médecine", 77: "L'Habillement", 78: "Les Bonnes mœurs (Al-Adab)",
+    79: "La Demande de permission (Al-Isti'dhân)", 80: "Les Invocations (Ad-Da'awât)",
+    81: "L'Adoucissement du cœur (Ar-Riqâq)", 82: "Le Décret divin (Al-Qadar)", 83: "Les Serments et les vœux",
+    84: "L'Expiation des serments non tenus", 85: "Les Successions (Al-Farâ'id)", 86: "Les Peines légales (Al-Hudûd)",
+    87: "Le Prix du sang (Ad-Diyât)", 88: "Les Apostats", 89: "La Contrainte (Al-Ikrâh)", 90: "Les Ruses (Al-Hiyal)",
+    91: "L'Interprétation des rêves", 92: "Les Troubles et la fin des temps (Al-Fitan)", 93: "Les Jugements (Al-Ahkâm)",
+    94: "Les Souhaits (At-Tamannî)", 95: "L'Acceptation du rapport d'une personne digne de confiance",
+    96: "L'Attachement au Coran et à la Sunna", 97: "L'Unicité d'Allah (At-Tawhîd)",
+}
+_HADITH_BOOK_NAMES_AR = {
+    1: "بدء الوحي", 2: "الإيمان", 3: "العلم", 4: "الوضوء", 5: "الغسل", 6: "الحيض", 7: "التيمم",
+    8: "الصلاة", 9: "مواقيت الصلاة", 10: "الأذان", 11: "الجمعة", 12: "صلاة الخوف", 13: "العيدين",
+    14: "الوتر", 15: "الاستسقاء", 16: "الكسوف", 17: "سجود القرآن", 18: "تقصير الصلاة", 19: "التهجد",
+    20: "فضل الصلاة في مسجد مكة والمدينة", 21: "العمل في الصلاة", 22: "السهو", 23: "الجنائز",
+    24: "الزكاة", 25: "الحج", 26: "العمرة", 27: "المحصر", 28: "جزاء الصيد", 29: "فضائل المدينة",
+    30: "الصوم", 31: "صلاة التراويح", 32: "فضل ليلة القدر", 33: "الاعتكاف", 34: "البيوع", 35: "السلم",
+    36: "الشفعة", 37: "الإجارة", 38: "الحوالة", 39: "الكفالة", 40: "الوكالة", 41: "الحرث والمزارعة",
+    42: "المساقاة", 43: "الاستقراض وأداء الديون والحجر والتفليس", 44: "الخصومات", 45: "اللقطة",
+    46: "المظالم", 47: "الشركة", 48: "الرهن", 49: "العتق", 50: "المكاتب", 51: "الهبة", 52: "الشهادات",
+    53: "الصلح", 54: "الشروط", 55: "الوصايا", 56: "الجهاد والسير", 57: "فرض الخمس", 58: "الجزية والموادعة",
+    59: "بدء الخلق", 60: "أحاديث الأنبياء", 61: "المناقب", 62: "فضائل أصحاب النبي", 63: "مناقب الأنصار",
+    64: "المغازي", 65: "التفسير", 66: "فضائل القرآن", 67: "النكاح", 68: "الطلاق", 69: "النفقات",
+    70: "الأطعمة", 71: "العقيقة", 72: "الذبائح والصيد", 73: "الأضاحي", 74: "الأشربة", 75: "المرضى",
+    76: "الطب", 77: "اللباس", 78: "الأدب", 79: "الاستئذان", 80: "الدعوات", 81: "الرقاق", 82: "القدر",
+    83: "الأيمان والنذور", 84: "كفارات الأيمان", 85: "الفرائض", 86: "الحدود", 87: "الديات",
+    88: "استتابة المرتدين", 89: "الإكراه", 90: "الحيل", 91: "تعبير الرؤيا", 92: "الفتن", 93: "الأحكام",
+    94: "التمني", 95: "أخبار الآحاد", 96: "الاعتصام بالكتاب والسنة", 97: "التوحيد",
+}
+
+
+def _hadith_book_name(book_number: int, lang: str, fallback: str) -> str:
+    """Titre localisé d'un livre — table locale (fr/ar), repli sur le nom
+    anglais du jeu de données pour les autres langues."""
+    if lang == "fr":
+        return _HADITH_BOOK_NAMES_FR.get(book_number, fallback)
+    if lang == "ar":
+        return _HADITH_BOOK_NAMES_AR.get(book_number, fallback)
+    return fallback
+
+
 @router.get("/hadith/books")
 async def hadith_books(lang: str = Query(default="fr")):
     """Liste des 97 livres/chapitres de Sahih al-Bukhari avec leur intervalle de hadiths."""
@@ -582,11 +655,12 @@ async def hadith_books(lang: str = Query(default="fr")):
     for key, name in sections.items():
         if key == "0" or not name:
             continue
+        num = int(key)
         d = details.get(key, {})
         first, last = d.get("hadithnumber_first"), d.get("hadithnumber_last")
         books.append({
-            "number": int(key),
-            "name": name,
+            "number": num,
+            "name": _hadith_book_name(num, lang, name),
             "hadithFirst": first,
             "hadithLast": last,
             "count": (last - first + 1) if (first and last) else 0,
@@ -611,7 +685,8 @@ async def hadith_book(book_number: int, lang: str = Query(default="fr")):
         raise HTTPException(404, "Livre invalide")
     first, last = d.get("hadithnumber_first"), d.get("hadithnumber_last")
     if not first or not last:
-        return {"bookNumber": book_number, "name": (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), ""), "hadiths": []}
+        raw_name = (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), "")
+        return {"bookNumber": book_number, "name": _hadith_book_name(book_number, lang, raw_name), "hadiths": []}
 
     ar_list = ar_data.get("hadiths", [])
     tr_list = (tr_data or ar_data).get("hadiths", [])
@@ -628,7 +703,8 @@ async def hadith_book(book_number: int, lang: str = Query(default="fr")):
             "grades": (tr_h or h).get("grades", []),
         })
 
-    name = (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), "")
+    raw_name = (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), "")
+    name = _hadith_book_name(book_number, lang, raw_name)
     return {"bookNumber": book_number, "name": name, "hadiths": hadiths}
 
 
@@ -672,7 +748,8 @@ async def hadith_one(hadith_number: int, lang: str = Query(default="fr")):
     tr_h = next((h for h in (tr_data or ar_data).get("hadiths", []) if h.get("hadithnumber") == hadith_number), ar_h)
 
     book_number = ar_h.get("reference", {}).get("book")
-    book_name = (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), "")
+    raw_book_name = (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), "")
+    book_name = _hadith_book_name(book_number, lang, raw_book_name)
     return {
         "hadithNumber": hadith_number,
         "textArabic": ar_h.get("text", ""),
