@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import io
 import json
 import os
 import re
@@ -22,6 +23,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response
 
 router = APIRouter(prefix="/api")
 
@@ -154,7 +156,7 @@ def _seed_defaults():
                 "lng": 2.3522,
             }
         ])
-    for coll in ("announcements.json", "events.json"):
+    for coll in ("announcements.json", "events.json", "attendance.json"):
         if not (DATA_DIR / coll).exists():
             _save_json(coll, [])
 
@@ -484,6 +486,31 @@ async def quran_verse(ref: str):
     return result
 
 
+@router.get("/quran/search")
+async def quran_search(q: str = Query(min_length=2)):
+    q = (q or "").strip().lower()
+    if len(q) < 2:
+        raise HTTPException(400, "q requis (min. 2 caractères)")
+    results: list[dict] = []
+    for num, _, tr, en, _ in SURAH_NAMES:
+        if len(results) >= 20:
+            break
+        if q in tr.lower() or q in en.lower():
+            results.append({"type": "surah", "ref": str(num), "text": f"{tr} / {en}", "match": tr})
+    if len(results) < 20:
+        try:
+            idx = _load_json("quran_index.json", {})
+            refs, norm = idx.get("refs", []), idx.get("norm", [])
+            for i, ver in enumerate(norm):
+                if len(results) >= 20:
+                    break
+                if q in ver:
+                    results.append({"type": "verse", "ref": refs[i], "text": ver[:60], "match": ver[:60]})
+        except Exception:
+            pass
+    return {"results": results}
+
+
 # --------------------------------------------------------------------------- #
 # Prayer times (aladhan.com proxy)
 # --------------------------------------------------------------------------- #
@@ -500,15 +527,29 @@ def _get_mosque_coords(mosque_id: str) -> tuple[float, float]:
 
 
 @router.get("/prayer-times/{mosque_id}")
-async def prayer_times(mosque_id: str, date: str = Query(default=None)):
+async def prayer_times(
+    mosque_id: str,
+    date: str = Query(default=None),
+    lat: float = Query(default=None, ge=-90, le=90, description="Remplace les coordonnées de la mosquée par une position exacte (géolocalisation navigateur)"),
+    lng: float = Query(default=None, ge=-180, le=180),
+):
     if not date:
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    cache_key = f"{mosque_id}_{date}"
+
+    # Position exacte de l'utilisateur si fournie (arrondie à ~1 km pour ne pas
+    # exploser le cache à chaque décimale de bruit GPS), sinon coordonnées de la mosquée.
+    use_geo = lat is not None and lng is not None
+    if use_geo:
+        lat, lng = round(lat, 2), round(lng, 2)
+        cache_key = f"geo_{lat}_{lng}_{date}"
+    else:
+        lat, lng = _get_mosque_coords(mosque_id)
+        cache_key = f"{mosque_id}_{date}"
+
     cached_entry = _prayer_cache.get(cache_key)
     if cached_entry and time.time() - cached_entry[0] < PRAYER_CACHE_TTL:
         return cached_entry[1]
 
-    lat, lng = _get_mosque_coords(mosque_id)
     url = f"https://api.aladhan.com/v1/timings/{date}?latitude={lat}&longitude={lng}&method=3"
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -528,9 +569,100 @@ async def prayer_times(mosque_id: str, date: str = Query(default=None)):
         "maghrib": {"name": "Maghrib", "time": timings.get("Maghrib", ""), "type": "obligatory"},
         "isha": {"name": "Isha", "time": timings.get("Isha", ""), "type": "obligatory"},
         "jummahTime": timings.get("Dhuhr", ""),
+        "source": "geo" if use_geo else "mosque",
+        "lat": lat,
+        "lng": lng,
     }
     _prayer_cache[cache_key] = (time.time(), result)
     return result
+
+
+# --------------------------------------------------------------------------- #
+# Hijri calendar
+# --------------------------------------------------------------------------- #
+
+_HIJRI_MONTHS_FR = [
+    "Mouharram", "Safar", "Rabi' al-awwal", "Rabi' al-thani",
+    "Joumada al-awwal", "Joumada al-thani", "Rajab", "Cha'ban",
+    "Ramadan", "Chawwal", "Dhou al-qi'da", "Dhou al-hijja",
+]
+_HIJRI_MONTHS_AR = [
+    "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
+    "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان",
+    "رمضان", "شوال", "ذو القعدة", "ذو الحجة",
+]
+_HIJRI_EPOCH_RD = 227014  # Rata Die of 1 Muharram 1 AH (anchors 2023-07-19 = 1/1/1445)
+
+
+def _islamic_leap(year: int) -> bool:
+    return (11 * year + 14) % 30 < 11
+
+
+def _islamic_to_rd(year: int, month: int, day: int) -> int:
+    dy = 354 * (year - 1) + sum(1 for yy in range(1, year) if _islamic_leap(yy))
+    dm = sum(30 if mm % 2 == 1 else 29 for mm in range(1, month))
+    return day + dy + dm + _HIJRI_EPOCH_RD
+
+
+def _greg_to_rd(y: int, m: int, d: int) -> int:
+    a = (14 - m) // 12
+    y2 = y + 4800 - a
+    m2 = m + 12 * a - 3
+    return d + (153 * m2 + 2) // 5 + 365 * y2 + y2 // 4 - y2 // 100 + y2 // 400 - 32045 - 1721425
+
+
+def _greg_to_hijri(y: int, m: int, d: int) -> tuple[int, int, int]:
+    rd = _greg_to_rd(y, m, d)
+    hy = ((rd - _HIJRI_EPOCH_RD) * 30 + 10646) // 10631
+    while _islamic_to_rd(hy + 1, 1, 1) <= rd:
+        hy += 1
+    while _islamic_to_rd(hy, 1, 1) > rd:
+        hy -= 1
+    hm = 1
+    while hm < 12 and _islamic_to_rd(hy, hm + 1, 1) <= rd:
+        hm += 1
+    hd = rd - _islamic_to_rd(hy, hm, 1) + 1
+    return hd, hm, hy
+
+
+@router.get("/hijri")
+async def hijri_date(date: str = Query(default=None)):
+    if not date:
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    parts = date.split("-")
+    if len(parts) != 3:
+        raise HTTPException(400, "Format: YYYY-MM-DD")
+    try:
+        gy, gm, gd = (int(x) for x in parts)
+        datetime(gy, gm, gd)
+    except ValueError:
+        raise HTTPException(400, "Date invalide")
+    hd, hm, hy = _greg_to_hijri(gy, gm, gd)
+    return {
+        "gregorian": date,
+        "hijri": {
+            "day": hd,
+            "month": hm,
+            "monthNameFr": _HIJRI_MONTHS_FR[hm - 1],
+            "monthNameAr": _HIJRI_MONTHS_AR[hm - 1],
+            "year": hy,
+        },
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Generic QR code PNG
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/qr.png")
+async def qr_png(text: str = Query(min_length=1), size: int = Query(default=10, ge=2, le=40)):
+    import qrcode
+    img = qrcode.make(text, box_size=size, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(buf.getvalue(), media_type="image/png",
+                    headers={"Cache-Control": "no-store"})
 
 
 # --------------------------------------------------------------------------- #
@@ -636,6 +768,18 @@ async def delete_announcement(item_id: str, user: dict = Depends(require_auth)):
 # --------------------------------------------------------------------------- #
 
 
+@router.get("/events/upcoming/{mosque_id}")
+async def list_upcoming_events(mosque_id: str, limit: int = Query(default=5, ge=1, le=50)):
+    all_ev = _load_json("events.json", [])
+    today = datetime.now(timezone.utc).date().isoformat()
+    upcoming = [
+        e for e in all_ev
+        if e.get("mosqueId") == mosque_id and (e.get("date") or "")[:10] >= today
+    ]
+    upcoming.sort(key=lambda e: ((e.get("date") or "")[:10], e.get("time", "") or e.get("startTime", "")))
+    return upcoming[:limit]
+
+
 @router.get("/events/{mosque_id}")
 async def list_events(mosque_id: str):
     all_ev = _load_json("events.json", [])
@@ -652,6 +796,11 @@ async def create_event(body: dict, user: dict = Depends(require_auth)):
         "description": body.get("description", ""),
         "date": body.get("date", ""),
         "time": body.get("time", ""),
+        "image": body.get("image", ""),
+        "location": body.get("location", ""),
+        "speaker": body.get("speaker", ""),
+        "category": body.get("category", "general"),
+        "startTime": body.get("startTime", ""),
         "createdAt": datetime.now(timezone.utc).isoformat(),
     }
     ev.append(item)
@@ -670,6 +819,61 @@ async def delete_event(item_id: str, user: dict = Depends(require_auth)):
 
 
 # --------------------------------------------------------------------------- #
+# Attendance (statistiques locales de prière)
+# --------------------------------------------------------------------------- #
+
+
+@router.post("/attendance")
+async def create_attendance(body: dict, user: dict = Depends(require_auth)):
+    prayer = (body.get("prayer") or "").strip()
+    date = (body.get("date") or "").strip()
+    try:
+        count = int(body.get("count", 0) or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "count doit être un entier")
+    if not prayer or not date or count < 0:
+        raise HTTPException(400, "prayer, date et count requis")
+    att = _load_json("attendance.json", [])
+    item = {
+        "id": secrets.token_hex(6),
+        "mosqueId": body.get("mosqueId") or "default",
+        "prayer": prayer,
+        "date": date,
+        "count": count,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }
+    att.append(item)
+    _save_json("attendance.json", att)
+    return item
+
+
+@router.get("/attendance")
+async def list_attendance(
+    mosque_id: str = Query(default=""),
+    month: str = Query(default=""),
+    user: dict = Depends(require_auth),
+):
+    att = _load_json("attendance.json", [])
+    out = [
+        a for a in att
+        if (not mosque_id or a.get("mosqueId") == mosque_id)
+        and (not month or (a.get("date") or "").startswith(month))
+    ]
+    out.sort(key=lambda a: (a.get("date", ""), a.get("prayer", "")))
+    return out
+
+
+@router.delete("/attendance/{item_id}")
+async def delete_attendance(item_id: str, user: dict = Depends(require_auth)):
+    att = _load_json("attendance.json", [])
+    new = [a for a in att if a["id"] != item_id]
+    if len(new) == len(att):
+        raise HTTPException(404, "Entrée introuvable")
+    _save_json("attendance.json", new)
+    return {"ok": True}
+
+
+# --------------------------------------------------------------------------- #
 # Admin
 # --------------------------------------------------------------------------- #
 
@@ -679,18 +883,23 @@ async def admin_stats(user: dict = Depends(require_auth)):
     users = _load_json("users.json", [])
     ann = _load_json("announcements.json", [])
     ev = _load_json("events.json", [])
+    att = _load_json("attendance.json", [])
     # Import ROOMS from main to count active sessions
     try:
         from main import ROOMS
         sessions_active = len([r for r in ROOMS.values() if r.status == "live"])
+        sessions_count = len(ROOMS)
     except Exception:
         sessions_active = 0
+        sessions_count = 0
     return {
         "users_count": len(users),
         "announcements_count": len(ann),
         "events_count": len(ev),
+        "attendance_count": len(att),
+        "attendance_total": sum(int(a.get("count", 0) or 0) for a in att),
         "sessions_active": sessions_active,
-        "sessions_count": len(ROOMS),
+        "sessions_count": sessions_count,
     }
 
 
@@ -719,6 +928,7 @@ def _get_config() -> dict:
             "city": default.get("address", ""),
             "prayer_method": 3,
             "default_language": "fr",
+            "donation": {},
         }
         _save_json("settings.json", config)
     return config
@@ -727,6 +937,17 @@ def _get_config() -> dict:
 @router.get("/admin/config")
 async def admin_get_config(user: dict = Depends(require_auth)):
     return _get_config()
+
+
+@router.get("/settings/public")
+async def public_settings():
+    config = _get_config()
+    return {
+        "name": config.get("name", ""),
+        "city": config.get("city", ""),
+        "donation": config.get("donation", {}),
+        "mosqueId": config.get("mosqueId", "default"),
+    }
 
 
 @router.put("/admin/config")
@@ -740,5 +961,11 @@ async def admin_put_config(body: dict, user: dict = Depends(require_auth)):
             config["prayer_method"] = int(body["prayer_method"])
         except (TypeError, ValueError):
             pass
+    if isinstance(body.get("donation"), dict):
+        current = config.get("donation") or {}
+        for key in ("paypal", "bankName", "iban", "title", "text"):
+            if body["donation"].get(key) is not None:
+                current[key] = body["donation"][key]
+        config["donation"] = current
     _save_json("settings.json", config)
     return config

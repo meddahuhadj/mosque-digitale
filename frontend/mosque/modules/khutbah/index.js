@@ -1,8 +1,8 @@
 // ── Khutbah Live Module ────────────────────────────────────────────────
 
-import { getSocket } from "../../core/socket.js";
-import { t } from "../../core/i18n.js";
-import { renderMain, toast } from "../../core/components.js";
+import { getSocket, setBroadcasterToken } from "../../core/socket.js";
+import { t, getLocaleTag } from "../../core/i18n.js";
+import { renderMain, toast, ornamentHtml } from "../../core/components.js";
 import { isAuthenticated, api } from "../../core/api.js";
 
 export async function renderKhutbah(params) {
@@ -62,6 +62,7 @@ async function renderLobby() {
           method: "POST",
           body: { target_langs: ["fr", "en"] },
         });
+        if (data.broadcaster_token) setBroadcasterToken(data.code, data.broadcaster_token);
         toast(`${t("session_created", "Session créée")}: ${data.code}`, "success");
         location.hash = `#/imam/${data.code}`;
       } catch (err) {
@@ -71,16 +72,29 @@ async function renderLobby() {
   }
 }
 
+// Taille de sous-titre persistée (échelle appliquée via --khutbah-fs).
+const FS_STEPS = [0.85, 1, 1.15, 1.35, 1.6];
+let _fsIndex = clampFsIndex(parseInt(localStorage.getItem("khutbah-fs-idx"), 10));
+let _ttsOn = localStorage.getItem("khutbah-tts") === "1";
+let _ttsLang = "fr";
+const _ttsQueue = [];
+const TTS_QUEUE_MAX = 3; // la file saute le retard pour rester proche du direct
+
+function clampFsIndex(i) {
+  return Number.isFinite(i) && i >= 0 && i < FS_STEPS.length ? i : 1;
+}
+
 async function renderListener(code) {
   renderMain(`
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
       <a href="#/khutbah" class="btn btn-sm btn-secondary">←</a>
-      <span style="font-weight:600;">🎙️ Khutbah Live</span>
+      <span style="font-weight:600; font-family:var(--font-heading);">🎙️ Khutbah Live</span>
+      <span id="khutbah-status" class="badge-live" style="margin-left:4px;">${t("connecting", "Connexion...")}</span>
       <span style="margin-left:auto; font-size:0.85em; color:var(--muted);" id="listener-count">0 👤</span>
     </div>
 
-    <div class="form-group" style="margin-bottom:12px;">
-      <select id="lang-select" style="width:auto;">
+    <div class="card" style="padding:12px 16px; margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <select id="lang-select" style="width:auto; flex:1; min-width:140px;">
         <option value="fr">Français</option>
         <option value="en">English</option>
         <option value="nl">Nederlands</option>
@@ -89,62 +103,120 @@ async function renderListener(code) {
         <option value="tr">Türkçe</option>
         <option value="ar">العربية</option>
       </select>
+      <button class="icon-btn" id="fs-minus" type="button" title="${t("text_smaller", "Texte plus petit")}" aria-label="${t("text_smaller", "Texte plus petit")}">A−</button>
+      <button class="icon-btn" id="fs-plus" type="button" title="${t("text_larger", "Texte plus grand")}" aria-label="${t("text_larger", "Texte plus grand")}">A+</button>
+      <button class="icon-btn" id="tts-toggle" type="button" title="${t("voice_playback", "Lecture vocale")}" aria-label="${t("voice_playback", "Lecture vocale")}" aria-pressed="${_ttsOn}">${_ttsOn ? "🔊" : "🔇"}</button>
     </div>
 
-    <div id="khutbah-status" style="text-align:center; padding:8px; color:var(--muted);">
-      ${t("connecting", "Connexion...")} <div class="spinner" style="width:16px;height:16px;"></div>
-    </div>
+    <div id="interim-line" style="direction:rtl; text-align:right; font-family:var(--font-arabic); font-size:1.5em; color:var(--accent2); min-height:1.4em; margin-bottom:8px;"></div>
 
-    <div id="segments" style="max-height:60vh; overflow-y:auto; padding:4px 0;"></div>
+    ${ornamentHtml("۞")}
+
+    <div id="segments" style="--khutbah-fs:${FS_STEPS[_fsIndex]}; max-height:60vh; overflow-y:auto; padding:4px 0 12px;"></div>
   `);
 
   const socket = getSocket("/khutbah");
   let lastSeq = 0;
+  const statusEl = () => document.getElementById("khutbah-status");
 
-  socket.on("connect", () => {
-    document.getElementById("khutbah-status").textContent = t("connected", "Connecté");
-    socket.emit("join-listen", { code, lang: document.getElementById("lang-select").value });
-  });
+  function setLive(isLive, label) {
+    const el = statusEl();
+    if (!el) return;
+    el.textContent = label;
+    el.classList.toggle("live", !!isLive);
+  }
+
+  socket.on("connect", () => setLive(false, t("connected", "Connecté")));
 
   socket.on("hello", (data) => {
-    document.getElementById("khutbah-status").textContent =
-      data.status === "live" ? "🔴 LIVE" : `⏸ ${data.status}`;
-    document.getElementById("listener-count").textContent = `${data.listeners || 0} 👤`;
+    setLive(data.status === "live", data.status === "live" ? `🔴 ${t("live", "LIVE")}` : `⏸ ${data.status}`);
     lastSeq = data.seq || 0;
 
     // Replay history
     if (data.history?.length) {
-      for (const seg of data.history) {
-        addSegment(seg);
-      }
+      for (const seg of data.history) addSegment(seg, { speak: false });
     }
   });
 
-  socket.on("phrase", (data) => {
-    addSegment(data);
-    lastSeq = data.seq;
+  socket.on("interim", (data) => {
+    const el = document.getElementById("interim-line");
+    if (el) el.textContent = data.arabic || "";
   });
 
-  socket.on("corrected", (data) => {
-    const el = document.querySelector(`[data-seq="${data.seq}"] .arabic`);
-    if (el) el.textContent = data.arabic;
+  socket.on("phrase", (data) => {
+    if (data.corrected) {
+      const el = document.querySelector(`[data-seq="${data.seq}"] .arabic`);
+      if (el) el.textContent = data.arabic || el.textContent;
+    } else {
+      addSegment(data, { speak: true });
+      lastSeq = data.seq;
+    }
   });
 
   socket.on("session", (data) => {
-    document.getElementById("khutbah-status").textContent =
-      data.status === "live" ? "🔴 LIVE" : `⏸ ${data.status}`;
+    setLive(data.status === "live", data.status === "live" ? `🔴 ${t("live", "LIVE")}` : `⏸ ${data.status}`);
   });
 
-  socket.on("disconnect", () => {
-    document.getElementById("khutbah-status").textContent = `⚠️ ${t("disconnected", "Déconnecté")} — ${t("reconnecting", "Reconnexion...")}`;
-  });
+  socket.on("disconnect", () => setLive(false, `⚠️ ${t("disconnected", "Déconnecté")} — ${t("reconnecting", "Reconnexion...")}`));
 
-  document.getElementById("lang-select").onchange = (e) => {
-    socket.emit("set-lang", { code, lang: e.target.value });
+  const langSelect = document.getElementById("lang-select");
+  _ttsLang = langSelect.value;
+  langSelect.onchange = (e) => {
+    _ttsLang = e.target.value;
+    stopSpeaking();
+    socket.emit("set-lang", { lang: e.target.value });
   };
+
+  document.getElementById("fs-minus").onclick = () => setFontScale(_fsIndex - 1);
+  document.getElementById("fs-plus").onclick = () => setFontScale(_fsIndex + 1);
+  document.getElementById("tts-toggle").onclick = () => setTtsEnabled(!_ttsOn);
+
+  // Join : the connection itself carries the code + lang
+  socket.emit("join-listen", { code, lang: langSelect.value });
+
+  // Le TTS ne doit pas survivre à un changement de page.
+  window.addEventListener("hashchange", stopSpeaking, { once: true });
 }
 
-function addSegment(data) {
+function setFontScale(index) {
+  _fsIndex = clampFsIndex(index);
+  localStorage.setItem("khutbah-fs-idx", String(_fsIndex));
+  const el = document.getElementById("segments");
+  if (el) el.style.setProperty("--khutbah-fs", FS_STEPS[_fsIndex]);
+}
+
+function setTtsEnabled(on) {
+  _ttsOn = on;
+  localStorage.setItem("khutbah-tts", on ? "1" : "0");
+  const btn = document.getElementById("tts-toggle");
+  if (btn) { btn.textContent = on ? "🔊" : "🔇"; btn.setAttribute("aria-pressed", String(on)); }
+  if (!on) stopSpeaking();
+}
+
+function stopSpeaking() {
+  _ttsQueue.length = 0;
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+function speak(text) {
+  if (!_ttsOn || !text || !window.speechSynthesis) return;
+  // Reste proche du direct : on saute les segments en attente plutôt que de prendre du retard.
+  if (_ttsQueue.length >= TTS_QUEUE_MAX) _ttsQueue.shift();
+  _ttsQueue.push(text);
+  if (!window.speechSynthesis.speaking) pumpTtsQueue();
+}
+
+function pumpTtsQueue() {
+  const next = _ttsQueue.shift();
+  if (next === undefined) return;
+  const utt = new SpeechSynthesisUtterance(next);
+  utt.lang = getLocaleTag(_ttsLang);
+  utt.onend = pumpTtsQueue;
+  utt.onerror = pumpTtsQueue;
+  window.speechSynthesis.speak(utt);
+}
+
+function addSegment(data, { speak: shouldSpeak = false } = {}) {
   const el = document.getElementById("segments");
   if (!el) return;
 
@@ -153,10 +225,12 @@ function addSegment(data) {
   div.setAttribute("data-seq", data.seq);
   div.innerHTML = `
     ${data.arabic ? `<div class="arabic">${data.arabic}</div>` : ""}
-    <div class="translation">${data.text || ""}</div>
+    <div class="translation" style="font-size:var(--khutbah-fs, 1em);">${data.text || ""}</div>
     ${data.is_quran && data.quran_ref ? `<div style="font-size:0.8em; color:var(--accent); margin-top:4px;">📖 ${data.quran_ref}</div>` : ""}
     ${data.degraded ? `<div style="font-size:0.75em; color:var(--warn);">⚠️ ${t("degraded", "Mode dégradé")}</div>` : ""}
   `;
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
+
+  if (shouldSpeak) speak(data.text);
 }

@@ -294,10 +294,113 @@ async function renderAdminAnalytics() {
           <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${stats.sessions_count ?? stats.sessions ?? 0}</div>
           <div style="color:var(--muted); margin-top:4px;">🎙️ ${t("sessions", "Sessions")}</div>
         </div>
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${stats.attendance_count ?? 0}</div>
+          <div style="color:var(--muted); margin-top:4px;">📝 ${t("attendance_sessions", "Séances comptées")}</div>
+        </div>
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${stats.attendance_total ?? 0}</div>
+          <div style="color:var(--muted); margin-top:4px;">👥 ${t("attendance_total", "Fidèles comptés")}</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <h3 class="card-header">➕ ${t("log_attendance", "Saisir la fréquentation")}</h3>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label>${t("prayer", "Prière")}</label>
+            <select id="att-prayer">
+              <option value="Fajr">Fajr</option>
+              <option value="Dhuhr">Dhuhr</option>
+              <option value="Asr">Asr</option>
+              <option value="Maghrib">Maghrib</option>
+              <option value="Isha" selected>Isha</option>
+              <option value="Jumu'ah">Jumu'ah</option>
+              <option value="Tarawih">Tarawih</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label>${t("date", "Date")}</label>
+            <input type="date" id="att-date" value="${new Date().toISOString().split("T")[0]}" />
+          </div>
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label>${t("count", "Nombre")}</label>
+            <input type="number" id="att-count" min="0" value="30" />
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button class="btn btn-primary" id="add-attendance">${t("add", "Ajouter")}</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-header">📋 ${t("attendance_history", "Historique")}</h3>
+        <div id="attendance-list"><div class="loading-center"><div class="spinner"></div></div></div>
       </div>
     `;
+
+    loadAttendance();
+
+    document.getElementById("add-attendance").onclick = async () => {
+      const prayer = document.getElementById("att-prayer").value;
+      const date = document.getElementById("att-date").value;
+      const count = parseInt(document.getElementById("att-count").value || "0", 10);
+      if (!date) { toast(t("date_required", "Date requise"), "error"); return; }
+      try {
+        await api("/api/attendance", { method: "POST", body: { prayer, date, count } });
+        toast(t("attendance_added", "Fréquentation ajoutée"), "success");
+        loadAttendance();
+        location.hash = "#/admin/analytics";
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    };
   } catch (err) {
     container.innerHTML = `<div class="card" style="color:var(--danger);">${err.message}</div>`;
+  }
+}
+
+async function loadAttendance() {
+  const list = document.getElementById("attendance-list");
+  if (!list) return;
+  try {
+    const att = await api("/api/attendance");
+    if (!att.length) {
+      list.innerHTML = `<div style="color:var(--muted); text-align:center; padding:16px;">${t("no_attendance", "Aucune saisie")}</div>`;
+      return;
+    }
+    list.innerHTML = `<div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse;">
+        <thead><tr style="text-align:left; border-bottom:2px solid var(--line);">
+          <th style="padding:8px;">${t("date", "Date")}</th>
+          <th style="padding:8px;">${t("prayer", "Prière")}</th>
+          <th style="padding:8px;">${t("count", "Nombre")}</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${att.map(a => `
+          <tr style="border-bottom:1px solid var(--line);">
+            <td style="padding:8px;">${a.date}</td>
+            <td style="padding:8px;">${a.prayer}</td>
+            <td style="padding:8px; font-weight:600;">${a.count}</td>
+            <td style="padding:8px; text-align:right;">
+              <button class="btn btn-danger btn-sm del-att" data-id="${a.id}">🗑️</button>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+
+    list.querySelectorAll(".del-att").forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm(t("confirm_delete", "Supprimer ?"))) return;
+        try {
+          await api(`/api/attendance/${btn.dataset.id}`, { method: "DELETE" });
+          loadAttendance();
+        } catch (err) { toast(err.message, "error"); }
+      };
+    });
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--danger);">${err.message}</div>`;
   }
 }
 
@@ -338,6 +441,27 @@ async function renderAdminSettings() {
           <option value="ar">العربية</option>
         </select>
       </div>
+      <h3 class="card-header" style="margin-top:18px;">🤲 ${t("donation", "Donation")}</h3>
+      <div class="form-group">
+        <label>${t("donation_title", "Titre (ex: Jum'ah du 15)")}</label>
+        <input type="text" id="cfg-don-title" placeholder="${t("donation_title", "Titre")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("donation_paypal", "Lien PayPal (optionnel)")}</label>
+        <input type="url" id="cfg-don-paypal" placeholder="https://www.paypal.com/donate?hosted_button_id=…" />
+      </div>
+      <div class="form-group">
+        <label>${t("bank_name", "Banque")}</label>
+        <input type="text" id="cfg-don-bank" placeholder="${t("bank_name", "Banque")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("donation_iban", "IBAN")}</label>
+        <input type="text" id="cfg-don-iban" placeholder="FR76 1234 5678 …" />
+      </div>
+      <div class="form-group">
+        <label>${t("donation_text", "Texte / montants (optionnel)")}</label>
+        <textarea id="cfg-don-text" rows="2" placeholder="${t("donation_text", "Texte")}"></textarea>
+      </div>
       <button class="btn btn-primary btn-block" id="save-settings">${t("save", "Enregistrer")}</button>
     </div>
   `);
@@ -349,6 +473,13 @@ async function renderAdminSettings() {
       if (cfg.city) document.getElementById("cfg-city").value = cfg.city;
       if (cfg.prayer_method) document.getElementById("cfg-method").value = cfg.prayer_method;
       if (cfg.default_language) document.getElementById("cfg-lang").value = cfg.default_language;
+      if (cfg.donation) {
+        if (cfg.donation.title) document.getElementById("cfg-don-title").value = cfg.donation.title;
+        if (cfg.donation.paypal) document.getElementById("cfg-don-paypal").value = cfg.donation.paypal;
+        if (cfg.donation.bankName) document.getElementById("cfg-don-bank").value = cfg.donation.bankName;
+        if (cfg.donation.iban) document.getElementById("cfg-don-iban").value = cfg.donation.iban;
+        if (cfg.donation.text) document.getElementById("cfg-don-text").value = cfg.donation.text;
+      }
     }
   } catch {
     // Config not yet set — form stays empty
@@ -360,6 +491,13 @@ async function renderAdminSettings() {
       city: document.getElementById("cfg-city").value.trim(),
       prayer_method: document.getElementById("cfg-method").value,
       default_language: document.getElementById("cfg-lang").value,
+      donation: {
+        title: document.getElementById("cfg-don-title").value.trim(),
+        paypal: document.getElementById("cfg-don-paypal").value.trim(),
+        bankName: document.getElementById("cfg-don-bank").value.trim(),
+        iban: document.getElementById("cfg-don-iban").value.trim(),
+        text: document.getElementById("cfg-don-text").value.trim(),
+      },
     };
     try {
       await api("/api/admin/config", { method: "PUT", body });

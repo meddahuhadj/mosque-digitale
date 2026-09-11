@@ -1,20 +1,21 @@
 // ── Internationalization (i18n) ────────────────────────────────────────
 
+// `tag` = BCP-47 locale for Intl.* (dates, clock) and speechSynthesis voices.
 const LANGUAGES = {
-  ar: { dir: "rtl", label: "العربية" },
-  fr: { dir: "ltr", label: "Français" },
-  en: { dir: "ltr", label: "English" },
-  nl: { dir: "ltr", label: "Nederlands" },
-  de: { dir: "ltr", label: "Deutsch" },
-  es: { dir: "ltr", label: "Español" },
-  tr: { dir: "ltr", label: "Türkçe" },
-  ur: { dir: "rtl", label: "اردو" },
-  bn: { dir: "ltr", label: "বাংলা" },
-  ha: { dir: "ltr", label: "Hausa" },
-  wo: { dir: "ltr", label: "Wolof" },
-  it: { dir: "ltr", label: "Italiano" },
-  pt: { dir: "ltr", label: "Português" },
-  id: { dir: "ltr", label: "Bahasa Indonesia" },
+  ar: { dir: "rtl", label: "العربية", tag: "ar-SA" },
+  fr: { dir: "ltr", label: "Français", tag: "fr-FR" },
+  en: { dir: "ltr", label: "English", tag: "en-US" },
+  nl: { dir: "ltr", label: "Nederlands", tag: "nl-NL" },
+  de: { dir: "ltr", label: "Deutsch", tag: "de-DE" },
+  es: { dir: "ltr", label: "Español", tag: "es-ES" },
+  tr: { dir: "ltr", label: "Türkçe", tag: "tr-TR" },
+  ur: { dir: "rtl", label: "اردو", tag: "ur-PK" },
+  bn: { dir: "ltr", label: "বাংলা", tag: "bn-BD" },
+  ha: { dir: "ltr", label: "Hausa", tag: "ha-NG" },
+  wo: { dir: "ltr", label: "Wolof", tag: "fr-FR" }, // pas de locale ICU dédiée : le français reste le plus proche
+  it: { dir: "ltr", label: "Italiano", tag: "it-IT" },
+  pt: { dir: "ltr", label: "Português", tag: "pt-PT" },
+  id: { dir: "ltr", label: "Bahasa Indonesia", tag: "id-ID" },
 };
 
 let _currentLang = localStorage.getItem("uiLang") || "fr";
@@ -25,6 +26,7 @@ export function getCurrentLang() { return _currentLang; }
 export function isRTL() { return LANGUAGES[_currentLang]?.dir === "rtl"; }
 export function getLangInfo(code) { return LANGUAGES[code]; }
 export function getSupportedLanguages() { return Object.keys(LANGUAGES); }
+export function getLocaleTag(lang = _currentLang) { return LANGUAGES[lang]?.tag || "fr-FR"; }
 
 export async function setLanguage(lang) {
   if (!LANGUAGES[lang]) return;
@@ -34,6 +36,7 @@ export async function setLanguage(lang) {
   applyTranslations();
   document.documentElement.lang = lang;
   document.documentElement.dir = LANGUAGES[lang].dir;
+  window.dispatchEvent(new CustomEvent("language-changed", { detail: { lang } }));
 }
 
 async function loadTranslations(lang) {

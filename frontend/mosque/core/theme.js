@@ -15,9 +15,12 @@ export function setTheme(theme) {
 }
 
 export function toggleTheme() {
+  setTheme(isDarkEffective() ? "light" : "dark");
+}
+
+export function isDarkEffective() {
   const current = document.documentElement.getAttribute("data-theme");
-  const isDark = current === "dark" || (!current && matchMedia("(prefers-color-scheme: dark)").matches);
-  setTheme(isDark ? "light" : "dark");
+  return current === "dark" || (!current && matchMedia("(prefers-color-scheme: dark)").matches);
 }
 
 export function setHighContrast(on) {

@@ -1,10 +1,15 @@
 // ── Mosqué Digital — Main App Entry ────────────────────────────────
 
 import { addRoute, startRouter, navigate } from "./router.js";
-import { initI18n, t, setLanguage, getCurrentLang, getSupportedLanguages, getLangInfo } from "./i18n.js";
-import { initTheme, toggleTheme, setTheme, setSeniorMode, setHighContrast } from "./theme.js";
+import { initI18n, t, setLanguage, getCurrentLang, getSupportedLanguages, getLangInfo, getLocaleTag } from "./i18n.js";
+import { initTheme, toggleTheme, setTheme, setSeniorMode, setHighContrast, isDarkEffective } from "./theme.js";
 import { isAuthenticated, setAuthChangeCallback, api, clearTokens } from "./api.js";
 import { toast, renderMain, showModal } from "./components.js";
+import { initPwaInstall } from "./pwa.js";
+
+// Capture `beforeinstallprompt` immediately at module load — it can fire
+// before any UI is ready to react to it.
+initPwaInstall();
 
 // ── Modules (lazy loaded) ─────────────────────────────────────────────
 
@@ -51,6 +56,11 @@ async function eventsPage(params) {
 async function ramadanPage(params) {
   const { renderRamadan } = await loadModule("ramadan/index");
   await renderRamadan(params);
+}
+
+async function supportPage() {
+  const { renderSupport } = await loadModule("support/index");
+  await renderSupport();
 }
 
 async function adminPage(params) {
@@ -133,6 +143,7 @@ addRoute("/khutbah/:code", khutbahPage);
 addRoute("/announcements", announcementsPage);
 addRoute("/events", eventsPage);
 addRoute("/ramadan", ramadanPage);
+addRoute("/support", supportPage);
 addRoute("/admin", adminPage);
 addRoute("/admin/:mosqueId", adminPage);
 addRoute("/imam", imamPage);
@@ -169,17 +180,84 @@ function updateNavigation() {
     .join("");
 }
 
+// ── Real-time header clock (no drift: resynced to Date.now() every tick) ──
+
+let _clockTimer = null;
+
+function renderClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, "0");
+  const m = String(now.getMinutes()).padStart(2, "0");
+  const s = String(now.getSeconds()).padStart(2, "0");
+  const hEl = document.querySelector(".hc-h");
+  const mEl = document.querySelector(".hc-m");
+  const sEl = document.querySelector(".hc-s");
+  const dEl = document.querySelector(".hc-date");
+  if (!hEl) return; // page not mounted (shouldn't happen, header is static)
+  hEl.textContent = h;
+  mEl.textContent = m;
+  sEl.textContent = s;
+  if (dEl) {
+    try {
+      dEl.textContent = new Intl.DateTimeFormat(getLocaleTag(), { weekday: "long", day: "numeric", month: "long" }).format(now);
+    } catch { dEl.textContent = now.toLocaleDateString(); }
+  }
+}
+
+function scheduleClockTick() {
+  if (_clockTimer) clearTimeout(_clockTimer);
+  renderClock();
+  // Aligns to the next real second boundary instead of a naive setInterval(1000),
+  // which drifts under load — each tick re-measures against Date.now().
+  const delay = 1000 - (Date.now() % 1000);
+  _clockTimer = setTimeout(function tick() {
+    renderClock();
+    _clockTimer = setTimeout(tick, 1000 - (Date.now() % 1000));
+  }, delay);
+}
+
+function initClock() {
+  scheduleClockTick();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") scheduleClockTick();
+  });
+}
+
+// ── Header tools: theme toggle + quick language switch ─────────────────
+
+function updateThemeIcon() {
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = isDarkEffective() ? "☀️" : "🌙";
+}
+
+function initHeaderTools() {
+  const themeBtn = document.getElementById("theme-toggle");
+  if (themeBtn) themeBtn.onclick = () => { toggleTheme(); updateThemeIcon(); };
+  updateThemeIcon();
+
+  const langSelect = document.getElementById("lang-quick");
+  if (langSelect) {
+    langSelect.innerHTML = getSupportedLanguages()
+      .map(l => `<option value="${l}" ${l === getCurrentLang() ? "selected" : ""}>${getLangInfo(l)?.label || l}</option>`)
+      .join("");
+    langSelect.onchange = (e) => setLanguage(e.target.value);
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────────────
 
 async function init() {
   initTheme();
   await initI18n();
   updateNavigation();
+  initHeaderTools();
+  initClock();
   setAuthChangeCallback(() => updateNavigation());
 
   // Listen for language changes
   window.addEventListener("language-changed", () => {
     updateNavigation();
+    initHeaderTools();
     // Re-render current page
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   });

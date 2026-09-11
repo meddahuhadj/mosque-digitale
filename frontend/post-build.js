@@ -1,12 +1,29 @@
-import { resolve } from 'path';
-import { readFileSync, writeFileSync, existsSync, cpSync } from 'fs';
+import { resolve, join } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const distDir = resolve(__dirname, '..', 'dist');
+// `fs.cpSync(..., { recursive: true })` crashes the Node process (no catchable
+// error, just a non-zero exit) when a path along the way contains non-ASCII
+// characters — this repo lives under "Mosuée Digitale 2". Plain
+// readdirSync/copyFileSync don't have that problem, so recurse by hand.
+function copyDirSync(src, dest) {
+  mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
+    const s = join(src, entry.name);
+    const d = join(dest, entry.name);
+    if (entry.isDirectory()) copyDirSync(s, d);
+    else copyFileSync(s, d);
+  }
+}
+
+// Matches vite.config.js's `build.outDir: '../dist'`, resolved relative to
+// the Vite root (mosque/) — i.e. frontend/dist, which is what
+// backend/main.py looks for (FRONTEND_DIR / "dist").
+const distDir = resolve(__dirname, 'dist');
 const indexPath = resolve(distDir, 'index.html');
 const mosqueDir = resolve(__dirname, 'mosque');
 
@@ -91,13 +108,22 @@ const assetsSrc = resolve(mosqueDir, 'assets');
 const assetsDest = resolve(distDir, 'assets');
 
 if (existsSync(assetsSrc)) {
-  cpSync(assetsSrc, assetsDest, { recursive: true });
+  copyDirSync(assetsSrc, assetsDest);
+}
+
+// Copy UI translations — core/i18n.js fetches them at runtime (`../lang/<lang>.json`),
+// so they must exist as static files next to the built index.html, not just be
+// bundled (they aren't: only JS modules get inlined by the step above).
+const langSrc = resolve(mosqueDir, 'lang');
+const langDest = resolve(distDir, 'lang');
+if (existsSync(langSrc)) {
+  copyDirSync(langSrc, langDest);
 }
 
 const manifestSrc = resolve(mosqueDir, 'manifest.webmanifest');
 const manifestDest = resolve(distDir, 'manifest.webmanifest');
 if (existsSync(manifestSrc)) {
-  cpSync(manifestSrc, manifestDest);
+  copyFileSync(manifestSrc, manifestDest);
 }
 
 const swSrc = resolve(mosqueDir, 'sw.js');

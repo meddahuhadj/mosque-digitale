@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1a6b4a" />
+<meta name="description" content="Mosqué Digital — Plateforme numérique complète pour les mosquées" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="manifest" href="./assets/manifest-iPtBoE_d.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="./assets/icon-D9TeCqoz.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32-BiDZqluL.png" />
+<link rel="apple-touch-icon" href="./assets/apple-touch-icon-BxW5r8LG.png" />
+<title>🕌 Mosqué Digital</title>
+<script>
+  try {
+    var _th = localStorage.getItem("theme");
+    if (_th === "light" || _th === "dark") document.documentElement.setAttribute("data-theme", _th);
+    var _c = localStorage.getItem("contrast");
+    if (_c === "high") document.documentElement.setAttribute("data-contrast", "high");
+    var _s = localStorage.getItem("senior-mode");
+    if (_s === "true") document.documentElement.setAttribute("data-senior", "true");
+  } catch(e) {}
+</script>
+<style>
+  :root {
+    --bg: #071310; --bg2: #0a1a15; --card: #0e2019; --card2: #0a1712;
+    --line: #1d3a2c; --fg: #eaf3ec; --muted: #8fae9c;
+    --accent: #1f8a5c; --accent2: #d4af37; --on-accent: #06120d;
+    --danger: #e5484d; --warn: #e0a83e; --ok: #2fae66;
+    --radius: 16px; --fs: 16px;
+    --shadow: 0 10px 30px -12px rgba(0,0,0,.7);
+    --gold-grad: linear-gradient(135deg, #f3d27a, #c9a227);
+    --accent-grad: linear-gradient(135deg, #23996a, #145a3d);
+    --font-heading: Georgia, "Amiri", "Noto Naskh Arabic", serif;
+    --font-arabic: "Noto Naskh Arabic", "Traditional Arabic", serif;
+    --ease: cubic-bezier(.4,0,.2,1);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #faf6ec; --bg2: #f3ecdb; --card: #fffdf8; --card2: #faf3e3;
+      --line: #d9c99e; --fg: #182a1c; --muted: #5c6b52;
+      --accent: #0f6b45; --accent2: #a3791a; --on-accent: #fff;
+      --danger: #c0392b; --warn: #8b6914; --ok: #1e7a34;
+      --shadow: 0 12px 32px -14px rgba(20,30,10,.16);
+      --gold-grad: linear-gradient(135deg, #dfb85f, #a3791a);
+      --accent-grad: linear-gradient(135deg, #148a57, #0f6b45);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #faf6ec; --bg2: #f3ecdb; --card: #fffdf8; --card2: #faf3e3;
+    --line: #d9c99e; --fg: #182a1c; --muted: #5c6b52;
+    --accent: #0f6b45; --accent2: #a3791a; --on-accent: #fff;
+    --danger: #c0392b; --warn: #8b6914; --ok: #1e7a34;
+    --shadow: 0 12px 32px -14px rgba(20,30,10,.16);
+    --gold-grad: linear-gradient(135deg, #dfb85f, #a3791a);
+    --accent-grad: linear-gradient(135deg, #148a57, #0f6b45);
+  }
+  :root[data-contrast="high"] {
+    --bg: #000; --bg2: #000; --card: #111; --card2: #000;
+    --line: #444; --fg: #fff; --muted: #ccc;
+    --accent: #00ff88; --accent2: #ffdd00; --on-accent: #000;
+    --gold-grad: #ffdd00; --accent-grad: #00ff88;
+  }
+  :root[data-senior="true"] {
+    --fs: 22px; --radius: 20px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Arabic", sans-serif; font-size: var(--fs); line-height: 1.5; color: var(--fg); background: var(--bg); min-height: 100dvh; }
+  body {
+    display: flex; flex-direction: column;
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent),
+      radial-gradient(ellipse 700px 400px at 100% 0%, color-mix(in srgb, var(--accent2) 7%, transparent), transparent);
+    background-attachment: fixed;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  button { cursor: pointer; font: inherit; }
+  input, select, textarea { font: inherit; }
+  h1, h2, h3 { font-family: var(--font-heading); letter-spacing: .01em; }
+  :root[data-contrast="high"] body { background-image: none; }
+
+  /* ── Ornaments ── */
+  .ornament { display: flex; align-items: center; gap: 10px; margin: 22px 0; color: var(--accent2); opacity: .8; font-size: .75em; letter-spacing: .3em; text-transform: uppercase; }
+  .ornament::before, .ornament::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--accent2), transparent); }
+  :root[data-contrast="high"] .ornament { opacity: 1; }
+  .bismillah { text-align: center; font-family: var(--font-arabic); direction: rtl; font-size: 1.5em; color: var(--accent2); margin: 4px 0 2px; }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; min-height: 100dvh; }
+  #header {
+    position: sticky; top: 0; z-index: 100;
+    background: color-mix(in srgb, var(--bg2) 88%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--accent2) 35%, transparent);
+    padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+  }
+  #header { flex-wrap: nowrap; }
+  #header .logo { font-size: 1.15em; font-weight: 700; color: var(--fg); display: flex; align-items: center; gap: 8px; min-width: 0; flex-shrink: 1; }
+  #header .logo span[data-i18n="app_name"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  #header .logo .mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent-grad); box-shadow: var(--shadow); font-size: 1.05em;
+  }
+  #header .logo span { background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  :root[data-contrast="high"] #header .logo span { background: none; -webkit-text-fill-color: unset; color: var(--fg); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  #header .nav { display: flex; gap: 4px; }
+  #header .nav a, #header .nav button { background: none; border: none; color: var(--muted); padding: 8px 12px; border-radius: 8px; font-size: 0.9em; transition: color .15s, background .15s; }
+  #header .nav a:hover, #header .nav button:hover, #header .nav a.active { color: var(--fg); background: var(--card); }
+  #header-tools { display: flex; align-items: center; gap: 4px; }
+
+  /* ── Real-time header clock ── */
+  .header-clock { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; padding-inline: 10px; border-inline: 1px solid var(--line); }
+  .hc-time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05em; letter-spacing: .02em; color: var(--fg); }
+  .hc-colon { animation: hcBlink 1s steps(1, end) infinite; color: var(--accent2); }
+  @media (prefers-reduced-motion: reduce) { .hc-colon { animation: none; } }
+  @keyframes hcBlink { 50% { opacity: .15; } }
+  .hc-date { font-size: .78em; color: var(--muted); text-transform: capitalize; }
+  @media (max-width: 700px) { .hc-date { display: none; } }
+  @media (max-width: 460px) { .hc-sec { display: none; } .header-clock { padding-inline: 6px; } }
+  @media (max-width: 340px) { .header-clock { display: none; } }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; border: 1px solid transparent; background: none; color: var(--muted); font-size: 1.05em; transition: all .15s var(--ease); }
+  .icon-btn:hover { color: var(--fg); background: var(--card); border-color: var(--line); }
+  select.lang-quick { background: var(--card2); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; font-size: .85em; max-width: 110px; }
+  @media (max-width: 460px) { select.lang-quick { max-width: 64px; } }
+  #main { flex: 1; padding: 16px; max-width: 1200px; margin: 0 auto; width: 100%; }
+  #main.page-enter { animation: pageIn .28s var(--ease) both; }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { #main.page-enter { animation: none; } }
+  #footer { border-top: 1px solid var(--line); padding: 12px 16px; text-align: center; color: var(--muted); font-size: 0.85em; }
+
+  /* ── Cards ── */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); position: relative; }
+  .card-header { font-size: 1.1em; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-family: var(--font-heading); }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .card-accent { border-top: 3px solid transparent; border-image: var(--gold-grad) 1; }
+  .card-link { cursor: pointer; transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s; }
+  .card-link:hover { transform: translateY(-3px); box-shadow: 0 16px 34px -14px rgba(0,0,0,.35); border-color: color-mix(in srgb, var(--accent2) 45%, var(--line)); }
+  @media (prefers-reduced-motion: reduce) { .card-link:hover { transform: none; } }
+  .icon-badge { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--card2)); font-size: 1.5em; flex-shrink: 0; }
+
+  /* ── Buttons ── */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border-radius: 10px; border: none; font-weight: 600; transition: all 0.15s var(--ease); min-height: 44px; }
+  .btn-primary { background: var(--accent-grad); color: var(--on-accent); }
+  .btn-primary:hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .btn-gold { background: var(--gold-grad); color: #241c04; }
+  .btn-gold:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn-secondary { background: var(--card2); color: var(--fg); border: 1px solid var(--line); }
+  .btn-secondary:hover { border-color: var(--accent2); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-sm { padding: 6px 14px; font-size: 0.85em; min-height: 36px; }
+  .btn-block { width: 100%; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+  .btn:focus-visible, .icon-btn:focus-visible, a:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
+  /* ── Forms ── */
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--muted); font-size: 0.9em; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); color: var(--fg); }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.15); }
+
+  /* ── Prayer Time Display ── */
+  .prayer-times-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .prayer-card { text-align: center; padding: 16px 12px; background: var(--card2); border-radius: 12px; border: 1px solid var(--line); transition: border-color .2s, box-shadow .2s; }
+  .prayer-card.active { border-color: var(--accent2); background: color-mix(in srgb, var(--accent) 12%, var(--card2)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent2) 40%, transparent); }
+  .prayer-card .name { font-size: 0.9em; color: var(--muted); margin-bottom: 4px; }
+  .prayer-card .time { font-size: 1.4em; font-weight: 700; }
+  .prayer-card .type { font-size: 0.75em; color: var(--muted); margin-top: 2px; }
+
+  /* ── Countdown ── */
+  .countdown { text-align: center; padding: 24px; }
+  .countdown .next-prayer { font-size: 1.8em; font-weight: 700; color: var(--accent); }
+  .countdown .timer { font-size: 2.5em; font-weight: 700; margin: 8px 0; }
+  .countdown .label { color: var(--muted); }
+
+  /* ── Radial Gauge (countdown ring) ── */
+  .gauge { --gauge-pct: 0; width: 148px; height: 148px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; background: conic-gradient(var(--accent2) calc(var(--gauge-pct) * 1%), var(--line) 0); }
+  .gauge::before { content: ""; position: absolute; inset: 10px; border-radius: 50%; background: var(--card); box-shadow: inset 0 2px 8px rgba(0,0,0,.15); }
+  .gauge .gauge-inner { position: relative; z-index: 1; text-align: center; }
+  .gauge .gauge-inner .timer { font-size: 1.5em; font-weight: 700; margin: 0; }
+  .gauge .gauge-inner .label { font-size: .68em; color: var(--muted); }
+  @media (prefers-reduced-motion: no-preference) { .gauge { transition: background 1s var(--ease); } }
+
+  /* ── Live badge ── */
+  .badge-live { font-size: .78em; padding: 4px 10px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line); color: var(--muted); }
+  .badge-live.live { color: #fff; background: var(--danger); border-color: transparent; animation: livePulse 2s ease-in-out infinite; }
+  @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: .65; } }
+  @media (prefers-reduced-motion: reduce) { .badge-live.live { animation: none; } }
+
+  /* ── Khutbah Live ── */
+  .khutbah-segment { padding: 12px 16px; border-left: 3px solid var(--accent2); margin-bottom: 8px; background: var(--card2); border-radius: 0 8px 8px 0; }
+  .khutbah-segment .arabic { font-size: 1.3em; color: var(--accent2); direction: rtl; text-align: right; margin-bottom: 4px; font-family: "Noto Naskh Arabic", serif; }
+  .khutbah-segment .translation { font-size: 1em; }
+  .khutbah-segment.degraded { border-left-color: var(--warn); opacity: 0.8; }
+  .khutbah-segment.quran { border-left-color: var(--accent); background: rgba(26,107,74,0.08); }
+
+  /* ── Quran Reader ── */
+  .ayah { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .ayah .arabic { font-size: 1.4em; direction: rtl; text-align: right; font-family: "Noto Naskh Arabic", serif; line-height: 1.8; }
+  .ayah .translation { color: var(--muted); margin-top: 4px; }
+  .ayah .ref { font-size: 0.75em; color: var(--accent); }
+
+  /* ── Announcements ── */
+  .announcement-item { padding: 16px; border-left: 4px solid var(--accent); margin-bottom: 12px; }
+  .announcement-item.urgent { border-left-color: var(--danger); }
+  .announcement-item .title { font-weight: 600; margin-bottom: 4px; }
+  .announcement-item .body { color: var(--muted); }
+  .announcement-item .meta { font-size: 0.8em; color: var(--muted); margin-top: 8px; }
+
+  /* ── Toast ── */
+  #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { padding: 12px 20px; border-radius: 10px; color: #fff; font-weight: 500; animation: slideIn 0.3s; min-width: 200px; }
+  .toast-success { background: var(--ok); }
+  .toast-error { background: var(--danger); }
+  .toast-info { background: var(--accent); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal { background: var(--card); border-radius: var(--radius); padding: 24px; max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto; }
+  .modal-header { font-size: 1.2em; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 1.5em; padding: 4px 8px; }
+
+  /* ── Loading ── */
+  .spinner { width: 24px; height: 24px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-center { display: flex; align-items: center; justify-content: center; padding: 40px; gap: 12px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    #header .nav { display: none; }
+    .card-grid { grid-template-columns: 1fr; }
+    .prayer-times-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* ── Mobile Nav ── */
+  #mobile-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: color-mix(in srgb, var(--bg2) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding: 8px 0 env(safe-area-inset-bottom, 8px); z-index: 100; }
+  @media (max-width: 600px) { #mobile-nav { display: flex; justify-content: space-around; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; } #mobile-nav::-webkit-scrollbar { display: none; } body { padding-bottom: env(safe-area-inset-bottom, 0); } #main { padding-bottom: 76px; } }
+  #mobile-nav a { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding: 6px 12px; color: var(--muted); font-size: 0.7em; text-decoration: none; transition: color .15s; }
+  #mobile-nav a.active, #mobile-nav a:hover { color: var(--accent2); }
+  #mobile-nav a .icon { font-size: 1.8em; margin-bottom: 2px; }
+
+  /* ── Hero (mosque background) ── */
+  .hero-mosque {
+    position: relative; overflow: hidden; text-align: center;
+    padding: 28px 16px 22px; border-radius: var(--radius); margin-bottom: 20px;
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--bg) 78%, transparent), var(--bg) 92%), url("./assets/mosque-bg-WOIaNs1K.jpg");
+    background-size: cover; background-position: center 65%;
+    border: 1px solid var(--line);
+  }
+  :root[data-contrast="high"] .hero-mosque, :root[data-senior="true"] .hero-mosque { background-image: none; }
+</style>
+  <script type="module">(function(){const n=document.createElement("link").relList;if(n&&n.supports&&n.supports("modulepreload"))return;for(const o of document.querySelectorAll('link[rel="modulepreload"]'))i(o);new MutationObserver(o=>{for(const s of o)if(s.type==="childList")for(const r of s.addedNodes)r.tagName==="LINK"&&r.rel==="modulepreload"&&i(r)}).observe(document,{childList:!0,subtree:!0});function a(o){const s={};return o.integrity&&(s.integrity=o.integrity),o.referrerPolicy&&(s.referrerPolicy=o.referrerPolicy),o.crossOrigin==="use-credentials"?s.credentials="include":o.crossOrigin==="anonymous"?s.credentials="omit":s.credentials="same-origin",s}function i(o){if(o.ep)return;o.ep=!0;const s=a(o);fetch(o.href,s)}})();const Xe="modulepreload",Ze=function(e,n){return new URL(e,n).href},pe={},_=function(n,a,i){let o=Promise.resolve();if(a&&a.length>0){const r=document.getElementsByTagName("link"),l=document.querySelector("meta[property=csp-nonce]"),d=(l==null?void 0:l.nonce)||(l==null?void 0:l.getAttribute("nonce"));o=Promise.allSettled(a.map(c=>{if(c=Ze(c,i),c in pe)return;pe[c]=!0;const m=c.endsWith(".css"),y=m?'[rel="stylesheet"]':"";if(!!i)for(let g=r.length-1;g>=0;g--){const f=r[g];if(f.href===c&&(!m||f.rel==="stylesheet"))return}else if(document.querySelector(`link[href="${c}"]${y}`))return;const b=document.createElement("link");if(b.rel=m?"stylesheet":Xe,m||(b.as="script"),b.crossOrigin="",b.href=c,d&&b.setAttribute("nonce",d),document.head.appendChild(b),m)return new Promise((g,f)=>{b.addEventListener("load",g),b.addEventListener("error",()=>f(new Error(`Unable to preload CSS for ${c}`)))})}))}function s(r){const l=new Event("vite:preloadError",{cancelable:!0});if(l.payload=r,window.dispatchEvent(l),!l.defaultPrevented)throw r}return o.then(r=>{for(const l of r||[])l.status==="rejected"&&s(l.reason);return n().catch(s)})},Se=[];function v(e,n,a={}){const i=[],o=e.replace(/:([^/]+)/g,(s,r)=>(i.push(r),"([^/]+)"));Se.push({pattern:e,regex:new RegExp(`^${o}$`),paramNames:i,handler:n,meta:a})}function et(e){location.hash=`#${e}`}function tt(e){const n=e.replace(/^#/,"")||"/";for(const a of Se){const i=n.match(a.regex);if(i){const o={};return a.paramNames.forEach((s,r)=>{o[s]=i[r+1]}),{route:a,params:o,path:n}}}return null}async function ge(){const e=location.hash||"#/",n=tt(e);if(!n){document.getElementById("main").innerHTML=`
+      <div style="text-align:center; padding:60px 20px;">
+        <div style="font-size:3em; margin-bottom:16px;">🕌</div>
+        <h2>404 — Page not found</h2>
+        <p style="color:var(--muted); margin:12px 0;">This page doesn't exist.</p>
+        <a href="#/" class="btn btn-primary">← Home</a>
+      </div>`;return}await n.route.handler(n.params),nt(n.path)}function nt(e){document.querySelectorAll("#main-nav a, #mobile-nav a").forEach(n=>{var i;const a=((i=n.getAttribute("href"))==null?void 0:i.replace("#",""))||"";n.classList.toggle("active",e.startsWith(a)&&a!=="/")})}function at(){window.addEventListener("hashchange",ge),ge()}const A={ar:{dir:"rtl",label:"العربية",tag:"ar-SA"},fr:{dir:"ltr",label:"Français",tag:"fr-FR"},en:{dir:"ltr",label:"English",tag:"en-US"},nl:{dir:"ltr",label:"Nederlands",tag:"nl-NL"},de:{dir:"ltr",label:"Deutsch",tag:"de-DE"},es:{dir:"ltr",label:"Español",tag:"es-ES"},tr:{dir:"ltr",label:"Türkçe",tag:"tr-TR"},ur:{dir:"rtl",label:"اردو",tag:"ur-PK"},bn:{dir:"ltr",label:"বাংলা",tag:"bn-BD"},ha:{dir:"ltr",label:"Hausa",tag:"ha-NG"},wo:{dir:"ltr",label:"Wolof",tag:"fr-FR"},it:{dir:"ltr",label:"Italiano",tag:"it-IT"},pt:{dir:"ltr",label:"Português",tag:"pt-PT"},id:{dir:"ltr",label:"Bahasa Indonesia",tag:"id-ID"}};let k=localStorage.getItem("uiLang")||"fr",Te={},J={};function R(){return k}function qe(e){return A[e]}function Ae(){return Object.keys(A)}function S(e=k){var n;return((n=A[e])==null?void 0:n.tag)||"fr-FR"}async function Be(e){A[e]&&(k=e,localStorage.setItem("uiLang",e),J[e]||await Le(e),je(),document.documentElement.lang=e,document.documentElement.dir=A[e].dir,window.dispatchEvent(new CustomEvent("language-changed",{detail:{lang:e}})))}async function Le(e){try{const n=await fetch(`../lang/${e}.json`);n.ok&&(Te[e]=await n.json(),J[e]=!0)}catch{}J[e]=J[e]||!0}function t(e,n){var i;return((i=Te[k])==null?void 0:i[e])||n||e}function je(){document.querySelectorAll("[data-i18n]").forEach(e=>{const n=e.getAttribute("data-i18n"),a=t(n);a!==n&&(e.textContent=a)}),document.querySelectorAll("[data-i18n-placeholder]").forEach(e=>{const n=e.getAttribute("data-i18n-placeholder"),a=t(n);a!==n&&(e.placeholder=a)})}async function it(){await Le(k),je(),document.documentElement.lang=k,A[k]&&(document.documentElement.dir=A[k].dir)}function Me(e){e==="auto"?(localStorage.removeItem("theme"),document.documentElement.removeAttribute("data-theme")):(localStorage.setItem("theme",e),document.documentElement.setAttribute("data-theme",e))}function ot(){Me(Pe()?"light":"dark")}function Pe(){const e=document.documentElement.getAttribute("data-theme");return e==="dark"||!e&&matchMedia("(prefers-color-scheme: dark)").matches}function st(e){e?(localStorage.setItem("contrast","high"),document.documentElement.setAttribute("data-contrast","high")):(localStorage.removeItem("contrast"),document.documentElement.removeAttribute("data-contrast"))}function rt(e){e?(localStorage.setItem("senior-mode","true"),document.documentElement.setAttribute("data-senior","true")):(localStorage.removeItem("senior-mode"),document.documentElement.removeAttribute("data-senior"))}function lt(){const e=localStorage.getItem("theme");e&&document.documentElement.setAttribute("data-theme",e),localStorage.getItem("contrast")==="high"&&document.documentElement.setAttribute("data-contrast","high"),localStorage.getItem("senior-mode")==="true"&&document.documentElement.setAttribute("data-senior","true")}var ke;const Ce=((ke=window.__CONFIG__)==null?void 0:ke.BACKEND_URL)||void 0||(location.hostname==="localhost"?"http://localhost:8000":location.origin),W=Ce;let T=localStorage.getItem("accessToken")||"",H=localStorage.getItem("refreshToken")||"",O=null;function dt(e){O=e}function Y(){return!!T}function ct(e,n){T=e,H=n,localStorage.setItem("accessToken",e),localStorage.setItem("refreshToken",n),O&&O(!0)}function ut(){T="",H="",localStorage.removeItem("accessToken"),localStorage.removeItem("refreshToken"),O&&O(!1)}async function mt(){if(!H)return!1;try{const e=await fetch(`${W}/api/auth/refresh`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refreshToken:H})});return e.ok?(T=(await e.json()).accessToken,localStorage.setItem("accessToken",T),!0):(ut(),!1)}catch{return!1}}async function u(e,n={}){const{method:a="GET",body:i,headers:o={},auth:s=!0}=n,r=e.startsWith("http")?e:`${W}${e}`,l={...o};s&&T&&(l.Authorization=`Bearer ${T}`),i&&!(i instanceof FormData)&&(l["Content-Type"]="application/json");let d=await fetch(r,{method:a,headers:l,body:i instanceof FormData?i:i?JSON.stringify(i):void 0});if(d.status===401&&s&&H&&await mt()&&(l.Authorization=`Bearer ${T}`,d=await fetch(r,{method:a,headers:l,body:i instanceof FormData?i:i?JSON.stringify(i):void 0})),!d.ok){const m=await d.json().catch(()=>({error:d.statusText}));throw new Error(m.error||`HTTP ${d.status}`)}const c=d.headers.get("content-type")||"";return c.includes("application/json")?d.json():c.includes("image/")?d.blob():d.text()}function p(e,n="info",a=4e3){const i=document.getElementById("toast-container"),o=document.createElement("div");o.className=`toast toast-${n}`,o.textContent=e,i.appendChild(o),setTimeout(()=>{o.style.opacity="0",setTimeout(()=>o.remove(),300)},a)}function h(e){const n=document.getElementById("main");typeof e=="string"?n.innerHTML=e:e instanceof HTMLElement&&(n.innerHTML="",n.appendChild(e)),n.classList.remove("page-enter"),n.offsetWidth,n.classList.add("page-enter")}function B(e="۞"){return`<div class="ornament" aria-hidden="true">${e}</div>`}let q=null,Q=!1;function le(){var e;return((e=window.matchMedia)==null?void 0:e.call(window,"(display-mode: standalone)").matches)||window.navigator.standalone===!0}function Ne(){return/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream}function ze(){return!!q&&!Q&&!le()}function pt(){return Ne()&&!Q&&!le()}function gt(){return ze()||pt()}async function ht(){if(!q)return"unavailable";q.prompt();const{outcome:e}=await q.userChoice;return q=null,window.dispatchEvent(new CustomEvent("pwa-installable-changed")),e}function yt(){le()&&(Q=!0),window.addEventListener("beforeinstallprompt",e=>{e.preventDefault(),q=e,window.dispatchEvent(new CustomEvent("pwa-installable-changed"))}),window.addEventListener("appinstalled",()=>{Q=!0,q=null,window.dispatchEvent(new CustomEvent("pwa-installable-changed"))})}yt();const vt=Object.assign({"../modules/admin/index.js":()=>_(()=>Promise.resolve().then(()=>jt),void 0,import.meta.url),"../modules/announcements/index.js":()=>_(()=>Promise.resolve().then(()=>Ct),void 0,import.meta.url),"../modules/auth/index.js":()=>_(()=>Promise.resolve().then(()=>zt),void 0,import.meta.url),"../modules/display/index.js":()=>_(()=>Promise.resolve().then(()=>Ht),void 0,import.meta.url),"../modules/events/index.js":()=>_(()=>Promise.resolve().then(()=>Ut),void 0,import.meta.url),"../modules/home/index.js":()=>_(()=>Promise.resolve().then(()=>Wt),void 0,import.meta.url),"../modules/imam/index.js":()=>_(()=>Promise.resolve().then(()=>an),void 0,import.meta.url),"../modules/khutbah/index.js":()=>_(()=>Promise.resolve().then(()=>un),void 0,import.meta.url),"../modules/prayer/index.js":()=>_(()=>Promise.resolve().then(()=>vn),void 0,import.meta.url),"../modules/quran/index.js":()=>_(()=>Promise.resolve().then(()=>En),void 0,import.meta.url),"../modules/ramadan/index.js":()=>_(()=>Promise.resolve().then(()=>Sn),void 0,import.meta.url),"../modules/support/index.js":()=>_(()=>Promise.resolve().then(()=>qn),void 0,import.meta.url)});async function w(e){const n=vt[`../modules/${e}.js`];if(!n)throw new Error(`Module introuvable: ${e}`);return n()}async function ft(){const{renderHome:e}=await w("home/index");await e()}async function De(e){const{renderPrayer:n}=await w("prayer/index");await n(e)}async function de(e){const{renderQuran:n}=await w("quran/index");await n(e)}async function He(e){const{renderKhutbah:n}=await w("khutbah/index");await n(e)}async function bt(e){const{renderAnnouncements:n}=await w("announcements/index");await n(e)}async function xt(e){const{renderEvents:n}=await w("events/index");await n(e)}async function $t(e){const{renderRamadan:n}=await w("ramadan/index");await n(e)}async function _t(){const{renderSupport:e}=await w("support/index");await e()}async function Oe(e){const{renderAdmin:n}=await w("admin/index");await n(e)}async function Re(e){const{renderImam:n}=await w("imam/index");await n(e)}async function Fe(e){const{renderAuth:n}=await w("auth/index");await n(e)}async function Ke(e){const{renderDisplay:n}=await w("display/index");await n(e)}async function wt(){h(`
+    <div class="card">
+      <h2 class="card-header">⚙️ ${t("settings","Paramètres")}</h2>
+
+      <div class="form-group">
+        <label>${t("language","Langue")}</label>
+        <select id="settings-lang">
+          ${Ae().map(e=>{var n;return`<option value="${e}" ${e===R()?"selected":""}>${((n=qe(e))==null?void 0:n.label)||e}</option>`}).join("")}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>${t("theme","Thème")}</label>
+        <select id="settings-theme">
+          <option value="auto" ${localStorage.getItem("theme")?"":"selected"}>${t("auto","Automatique")}</option>
+          <option value="dark" ${localStorage.getItem("theme")==="dark"?"selected":""}>${t("dark","Sombre")}</option>
+          <option value="light" ${localStorage.getItem("theme")==="light"?"selected":""}>${t("light","Clair")}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>${t("accessibility","Accessibilité")}</label>
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <input type="checkbox" id="senior-mode" ${localStorage.getItem("senior-mode")==="true"?"checked":""} />
+          ${t("senior_mode","Mode senior (gros texte)")}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="high-contrast" ${localStorage.getItem("contrast")==="high"?"checked":""} />
+          ${t("high_contrast","Contraste élevé")}
+        </label>
+      </div>
+
+      <button class="btn btn-secondary" id="settings-clear" style="margin-top:16px;">${t("clear_cache","Vider le cache")}</button>
+    </div>
+  `),document.getElementById("settings-lang").onchange=e=>Be(e.target.value),document.getElementById("settings-theme").onchange=e=>Me(e.target.value),document.getElementById("senior-mode").onchange=e=>rt(e.target.checked),document.getElementById("high-contrast").onchange=e=>st(e.target.checked),document.getElementById("settings-clear").onclick=()=>{caches&&caches.keys().then(e=>e.forEach(n=>caches.delete(n))),p(t("cache_cleared","Cache vidé"),"success")}}v("/",ft);v("/prayer",De);v("/prayer/:mosqueId",De);v("/quran",de);v("/quran/surah/:number",de);v("/quran/verse/:ref",de);v("/khutbah",He);v("/khutbah/:code",He);v("/announcements",bt);v("/events",xt);v("/ramadan",$t);v("/support",_t);v("/admin",Oe);v("/admin/:mosqueId",Oe);v("/imam",Re);v("/imam/:code",Re);v("/auth",Fe);v("/auth/:action",Fe);v("/display",Ke);v("/display/:mosqueId",Ke);v("/settings",wt);function X(){const e=[{href:"#/",icon:"🏠",label:t("home","Accueil")},{href:"#/prayer",icon:"🕌",label:t("prayers","Prières")},{href:"#/quran",icon:"📖",label:t("quran","Coran")},{href:"#/khutbah",icon:"🎙️",label:t("khutbah_live","Khutbah Live")},{href:"#/announcements",icon:"📢",label:t("announcements","Annonces")},{href:"#/events",icon:"📅",label:t("events","Événements")},{href:"#/settings",icon:"⚙️",label:t("settings","Paramètres")}],n=document.getElementById("main-nav"),a=document.getElementById("mobile-nav");n.innerHTML=e.filter((i,o)=>o<5).map(i=>`<a href="${i.href}">${i.icon} ${i.label}</a>`).join(""),a.innerHTML=e.map(i=>`<a href="${i.href}"><span class="icon">${i.icon}</span>${i.label}</a>`).join("")}let U=null;function he(){const e=new Date,n=String(e.getHours()).padStart(2,"0"),a=String(e.getMinutes()).padStart(2,"0"),i=String(e.getSeconds()).padStart(2,"0"),o=document.querySelector(".hc-h"),s=document.querySelector(".hc-m"),r=document.querySelector(".hc-s"),l=document.querySelector(".hc-date");if(o&&(o.textContent=n,s.textContent=a,r.textContent=i,l))try{l.textContent=new Intl.DateTimeFormat(S(),{weekday:"long",day:"numeric",month:"long"}).format(e)}catch{l.textContent=e.toLocaleDateString()}}function ye(){U&&clearTimeout(U),he();const e=1e3-Date.now()%1e3;U=setTimeout(function n(){he(),U=setTimeout(n,1e3-Date.now()%1e3)},e)}function It(){ye(),document.addEventListener("visibilitychange",()=>{document.visibilityState==="visible"&&ye()})}function ve(){const e=document.getElementById("theme-toggle");e&&(e.textContent=Pe()?"☀️":"🌙")}function fe(){const e=document.getElementById("theme-toggle");e&&(e.onclick=()=>{ot(),ve()}),ve();const n=document.getElementById("lang-quick");n&&(n.innerHTML=Ae().map(a=>{var i;return`<option value="${a}" ${a===R()?"selected":""}>${((i=qe(a))==null?void 0:i.label)||a}</option>`}).join(""),n.onchange=a=>Be(a.target.value))}async function Et(){lt(),await it(),X(),fe(),It(),dt(()=>X()),window.addEventListener("language-changed",()=>{X(),fe(),window.dispatchEvent(new HashChangeEvent("hashchange"))}),at()}Et().catch(e=>{console.error("App init failed:",e),h(`<div style="text-align:center;padding:60px;"><h2>⚠️ Initialization Error</h2><p>${e.message}</p></div>`)});"serviceWorker"in navigator&&navigator.serviceWorker.register("./sw.js").catch(()=>{});async function kt(e){if(!Y()){h(`
+      <div class="card" style="max-width:420px; margin:40px auto; text-align:center;">
+        <h2>🧑‍💼 ${t("admin","Administration")}</h2>
+        <p style="color:var(--muted); margin:12px 0;">${t("login_required","Connexion requise")}</p>
+        <a href="#/auth/login" class="btn btn-primary">${t("login","Se connecter")}</a>
+      </div>
+    `);return}switch((e==null?void 0:e.view)||(e==null?void 0:e.mosqueId)){case"mosques":return St();case"users":return Tt();case"sessions":return qt();case"analytics":return At();case"settings":return Bt();case"announcements":return Lt()}h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/" class="btn btn-sm btn-secondary">←</a>
+      <h2>🧑‍💼 ${t("admin_dashboard","Tableau de bord")}</h2>
+    </div>
+
+    <div class="card-grid">
+      <a href="#/admin/mosques" class="card" style="cursor:pointer; text-decoration:none; color:var(--fg); display:flex; gap:12px; align-items:center;">
+        <span style="font-size:2em;">🕌</span>
+        <div><div style="font-weight:600;">${t("mosques","Mosquées")}</div><div style="font-size:0.85em; color:var(--muted);">${t("manage_mosques","Gérer les mosquées")}</div></div>
+      </a>
+
+      <a href="#/admin/users" class="card" style="cursor:pointer; text-decoration:none; color:var(--fg); display:flex; gap:12px; align-items:center;">
+        <span style="font-size:2em;">👥</span>
+        <div><div style="font-weight:600;">${t("users","Utilisateurs")}</div><div style="font-size:0.85em; color:var(--muted);">${t("manage_users","Gérer les rôles")}</div></div>
+      </a>
+
+      <a href="#/admin/sessions" class="card" style="cursor:pointer; text-decoration:none; color:var(--fg); display:flex; gap:12px; align-items:center;">
+        <span style="font-size:2em;">🎙️</span>
+        <div><div style="font-weight:600;">${t("sessions","Sessions")}</div><div style="font-size:0.85em; color:var(--muted);">${t("session_history","Historique des khutbahs")}</div></div>
+      </a>
+
+      <a href="#/admin/analytics" class="card" style="cursor:pointer; text-decoration:none; color:var(--fg); display:flex; gap:12px; align-items:center;">
+        <span style="font-size:2em;">📊</span>
+        <div><div style="font-weight:600;">${t("analytics","Statistiques")}</div><div style="font-size:0.85em; color:var(--muted);">${t("view_stats","Voir les statistiques")}</div></div>
+      </a>
+
+      <a href="#/admin/settings" class="card" style="cursor:pointer; text-decoration:none; color:var(--fg); display:flex; gap:12px; align-items:center;">
+        <span style="font-size:2em;">⚙️</span>
+        <div><div style="font-weight:600;">${t("settings","Paramètres")}</div><div style="font-size:0.85em; color:var(--muted);">${t("mosque_config","Configuration de la mosquée")}</div></div>
+      </a>
+
+      <a href="#/admin/announcements" class="card" style="cursor:pointer; text-decoration:none; color:var(--fg); display:flex; gap:12px; align-items:center;">
+        <span style="font-size:2em;">📢</span>
+        <div><div style="font-weight:600;">${t("announcements","Annonces")}</div><div style="font-size:0.85em; color:var(--muted);">${t("create_announcement","Créer une annonce")}</div></div>
+      </a>
+    </div>
+  `)}async function St(){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/admin" class="btn btn-sm btn-secondary">← ${t("back_to_dashboard","Retour au tableau de bord")}</a>
+      <h2>🕌 ${t("mosques","Mosquées")}</h2>
+    </div>
+    <div id="mosques-list"><div class="loading-center"><div class="spinner"></div></div></div>
+
+    <div class="card" style="max-width:500px; margin-top:16px;">
+      <h3 class="card-header">➕ ${t("create_mosque","Nouvelle mosquée")}</h3>
+      <div class="form-group">
+        <label>${t("name","Nom")}</label>
+        <input type="text" id="mosque-name" placeholder="${t("mosque_name","Nom de la mosquée")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("city","Ville")}</label>
+        <input type="text" id="mosque-city" placeholder="${t("city_name","Ville")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("latitude","Latitude")}</label>
+        <input type="number" step="any" id="mosque-lat" placeholder="48.8566" />
+      </div>
+      <div class="form-group">
+        <label>${t("longitude","Longitude")}</label>
+        <input type="number" step="any" id="mosque-lng" placeholder="2.3522" />
+      </div>
+      <button class="btn btn-primary btn-block" id="create-mosque">${t("create","Créer")}</button>
+    </div>
+  `);async function e(){const n=document.getElementById("mosques-list");try{const a=await u("/api/mosques");if(!a.length){n.innerHTML=`<div class="card" style="text-align:center; color:var(--muted); padding:24px;">${t("no_mosques","Aucune mosquée")}</div>`;return}n.innerHTML=`<div class="card-grid">${a.map(i=>`
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:600;">🕌 ${i.name}</div>
+            <div style="font-size:0.85em; color:var(--muted);">📍 ${i.city||"—"}</div>
+          </div>
+          <button class="btn btn-danger btn-sm delete-mosque" data-id="${i.id}">🗑️</button>
+        </div>
+      `).join("")}</div>`,n.querySelectorAll(".delete-mosque").forEach(i=>{i.onclick=async()=>{if(confirm(t("confirm_delete","Supprimer cette mosquée ?")))try{await u(`/api/mosques/${i.dataset.id}`,{method:"DELETE"}),p(t("deleted","Supprimé"),"success"),e()}catch(o){p(o.message,"error")}}})}catch(a){n.innerHTML=`<div class="card" style="color:var(--danger);">${a.message}</div>`}}e(),document.getElementById("create-mosque").onclick=async()=>{const n=document.getElementById("mosque-name").value.trim(),a=document.getElementById("mosque-city").value.trim(),i=parseFloat(document.getElementById("mosque-lat").value)||null,o=parseFloat(document.getElementById("mosque-lng").value)||null;if(!n){p(t("name_required","Nom requis"),"error");return}try{await u("/api/mosques",{method:"POST",body:{name:n,city:a,latitude:i,longitude:o}}),p(t("mosque_created","Mosquée créée"),"success"),document.getElementById("mosque-name").value="",document.getElementById("mosque-city").value="",document.getElementById("mosque-lat").value="",document.getElementById("mosque-lng").value="",e()}catch(s){p(s.message,"error")}}}async function Tt(){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/admin" class="btn btn-sm btn-secondary">← ${t("back_to_dashboard","Retour au tableau de bord")}</a>
+      <h2>👥 ${t("users","Utilisateurs")}</h2>
+    </div>
+    <div id="users-list"><div class="loading-center"><div class="spinner"></div></div></div>
+  `);const e=document.getElementById("users-list");try{const n=await u("/api/admin/users");if(!n.length){e.innerHTML=`<div class="card" style="text-align:center; color:var(--muted); padding:24px;">${t("no_users","Aucun utilisateur")}</div>`;return}e.innerHTML=`
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="text-align:left; border-bottom:2px solid var(--line);">
+              <th style="padding:10px 12px;">${t("name","Nom")}</th>
+              <th style="padding:10px 12px;">${t("email","Email")}</th>
+              <th style="padding:10px 12px;">${t("role","Rôle")}</th>
+              <th style="padding:10px 12px;">${t("created","Créé le")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${n.map(a=>`
+              <tr style="border-bottom:1px solid var(--line);">
+                <td style="padding:10px 12px; font-weight:600;">${a.name||"—"}</td>
+                <td style="padding:10px 12px; color:var(--muted);">${a.email||"—"}</td>
+                <td style="padding:10px 12px;"><span style="background:var(--bg2); padding:2px 8px; border-radius:6px; font-size:0.85em;">${a.role||"user"}</span></td>
+                <td style="padding:10px 12px; color:var(--muted); font-size:0.85em;">${a.created_at?new Date(a.created_at).toLocaleDateString("fr-FR"):"—"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `}catch(n){e.innerHTML=`<div class="card" style="color:var(--danger);">${n.message}</div>`}}async function qt(){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/admin" class="btn btn-sm btn-secondary">← ${t("back_to_dashboard","Retour au tableau de bord")}</a>
+      <h2>🎙️ ${t("sessions","Sessions")}</h2>
+    </div>
+    <div id="sessions-list"><div class="loading-center"><div class="spinner"></div></div></div>
+  `);const e=document.getElementById("sessions-list");try{const[n,a]=await Promise.all([u("/api/healthz").catch(()=>null),u("/api/admin/stats").catch(()=>({}))]);let i="";n!=null&&n.sessions&&(i+=`
+        <div class="card" style="margin-bottom:16px;">
+          <h3 class="card-header">🟢 ${t("active_sessions","Sessions actives")}</h3>
+          ${n.sessions.length?n.sessions.map(o=>`
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);">
+              <div>
+                <span style="font-weight:600;">${o.code||"—"}</span>
+                <span style="font-size:0.85em; color:var(--muted); margin-left:8px;">${o.status||""}</span>
+              </div>
+              <a href="#/imam/${o.code}" class="btn btn-sm btn-secondary">${t("manage","Gérer")}</a>
+            </div>
+          `).join(""):`<div style="color:var(--muted); padding:16px 0;">${t("no_active_sessions","Aucune session active")}</div>`}
+        </div>
+      `),(a==null?void 0:a.sessions_count)!==void 0&&(i+=`
+        <div class="card">
+          <h3 class="card-header">📊 ${t("session_summary","Résumé des sessions")}</h3>
+          <div style="padding:16px 0; font-size:1.1em;">
+            <div style="display:flex; justify-content:space-between; padding:6px 0;">
+              <span style="color:var(--muted);">${t("total_sessions","Sessions totales")}</span>
+              <span style="font-weight:600;">${a.sessions_count}</span>
+            </div>
+          </div>
+        </div>
+      `),e.innerHTML=i||`<div class="card" style="text-align:center; color:var(--muted); padding:24px;">${t("no_data","Aucune donnée disponible")}</div>`}catch(n){e.innerHTML=`<div class="card" style="color:var(--danger);">${n.message}</div>`}}async function At(){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/admin" class="btn btn-sm btn-secondary">← ${t("back_to_dashboard","Retour au tableau de bord")}</a>
+      <h2>📊 ${t("analytics","Statistiques")}</h2>
+    </div>
+    <div id="analytics-content"><div class="loading-center"><div class="spinner"></div></div></div>
+  `);const e=document.getElementById("analytics-content");try{const n=await u("/api/admin/stats");e.innerHTML=`
+      <div class="card-grid">
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${n.users_count??0}</div>
+          <div style="color:var(--muted); margin-top:4px;">👥 ${t("users","Utilisateurs")}</div>
+        </div>
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${n.announcements_count??n.announcements??0}</div>
+          <div style="color:var(--muted); margin-top:4px;">📢 ${t("announcements","Annonces")}</div>
+        </div>
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${n.events_count??n.events??0}</div>
+          <div style="color:var(--muted); margin-top:4px;">📅 ${t("events","Événements")}</div>
+        </div>
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${n.sessions_count??n.sessions??0}</div>
+          <div style="color:var(--muted); margin-top:4px;">🎙️ ${t("sessions","Sessions")}</div>
+        </div>
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${n.attendance_count??0}</div>
+          <div style="color:var(--muted); margin-top:4px;">📝 ${t("attendance_sessions","Séances comptées")}</div>
+        </div>
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="font-size:2.5em; font-weight:700; color:var(--accent);">${n.attendance_total??0}</div>
+          <div style="color:var(--muted); margin-top:4px;">👥 ${t("attendance_total","Fidèles comptés")}</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <h3 class="card-header">➕ ${t("log_attendance","Saisir la fréquentation")}</h3>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label>${t("prayer","Prière")}</label>
+            <select id="att-prayer">
+              <option value="Fajr">Fajr</option>
+              <option value="Dhuhr">Dhuhr</option>
+              <option value="Asr">Asr</option>
+              <option value="Maghrib">Maghrib</option>
+              <option value="Isha" selected>Isha</option>
+              <option value="Jumu'ah">Jumu'ah</option>
+              <option value="Tarawih">Tarawih</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label>${t("date","Date")}</label>
+            <input type="date" id="att-date" value="${new Date().toISOString().split("T")[0]}" />
+          </div>
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label>${t("count","Nombre")}</label>
+            <input type="number" id="att-count" min="0" value="30" />
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button class="btn btn-primary" id="add-attendance">${t("add","Ajouter")}</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-header">📋 ${t("attendance_history","Historique")}</h3>
+        <div id="attendance-list"><div class="loading-center"><div class="spinner"></div></div></div>
+      </div>
+    `,ne(),document.getElementById("add-attendance").onclick=async()=>{const a=document.getElementById("att-prayer").value,i=document.getElementById("att-date").value,o=parseInt(document.getElementById("att-count").value||"0",10);if(!i){p(t("date_required","Date requise"),"error");return}try{await u("/api/attendance",{method:"POST",body:{prayer:a,date:i,count:o}}),p(t("attendance_added","Fréquentation ajoutée"),"success"),ne(),location.hash="#/admin/analytics"}catch(s){p(s.message,"error")}}}catch(n){e.innerHTML=`<div class="card" style="color:var(--danger);">${n.message}</div>`}}async function ne(){const e=document.getElementById("attendance-list");if(e)try{const n=await u("/api/attendance");if(!n.length){e.innerHTML=`<div style="color:var(--muted); text-align:center; padding:16px;">${t("no_attendance","Aucune saisie")}</div>`;return}e.innerHTML=`<div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse;">
+        <thead><tr style="text-align:left; border-bottom:2px solid var(--line);">
+          <th style="padding:8px;">${t("date","Date")}</th>
+          <th style="padding:8px;">${t("prayer","Prière")}</th>
+          <th style="padding:8px;">${t("count","Nombre")}</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${n.map(a=>`
+          <tr style="border-bottom:1px solid var(--line);">
+            <td style="padding:8px;">${a.date}</td>
+            <td style="padding:8px;">${a.prayer}</td>
+            <td style="padding:8px; font-weight:600;">${a.count}</td>
+            <td style="padding:8px; text-align:right;">
+              <button class="btn btn-danger btn-sm del-att" data-id="${a.id}">🗑️</button>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`,e.querySelectorAll(".del-att").forEach(a=>{a.onclick=async()=>{if(confirm(t("confirm_delete","Supprimer ?")))try{await u(`/api/attendance/${a.dataset.id}`,{method:"DELETE"}),ne()}catch(i){p(i.message,"error")}}})}catch(n){e.innerHTML=`<div style="color:var(--danger);">${n.message}</div>`}}async function Bt(){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/admin" class="btn btn-sm btn-secondary">← ${t("back_to_dashboard","Retour au tableau de bord")}</a>
+      <h2>⚙️ ${t("settings","Paramètres")}</h2>
+    </div>
+    <div class="card" style="max-width:500px;">
+      <div class="form-group">
+        <label>${t("mosque_name","Nom de la mosquée")}</label>
+        <input type="text" id="cfg-name" placeholder="${t("mosque_name_placeholder","Al-Fath")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("city","Ville")}</label>
+        <input type="text" id="cfg-city" placeholder="${t("city_name","Ville")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("prayer_method","Méthode de prière")}</label>
+        <select id="cfg-method">
+          <option value="1">${t("method_mwl","MWL (Muslim World League)")}</option>
+          <option value="2">${t("method_islamic_society","Islamic Society of North America)")}</option>
+          <option value="3">${t("method_egypt","Egyptian General Authority)")}</option>
+          <option value="5">${t("method_turkey","Diyanet (Turquie)")}</option>
+          <option value="7">${t("method_jakim","JAKIM (Malaisie)")}</option>
+          <option value="12">${t("method_umm_al_qura","Umm Al-Qura (Arabie Saoudite)")}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>${t("default_language","Langue par défaut")}</label>
+        <select id="cfg-lang">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="nl">Nederlands</option>
+          <option value="ar">العربية</option>
+        </select>
+      </div>
+      <h3 class="card-header" style="margin-top:18px;">🤲 ${t("donation","Donation")}</h3>
+      <div class="form-group">
+        <label>${t("donation_title","Titre (ex: Jum'ah du 15)")}</label>
+        <input type="text" id="cfg-don-title" placeholder="${t("donation_title","Titre")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("donation_paypal","Lien PayPal (optionnel)")}</label>
+        <input type="url" id="cfg-don-paypal" placeholder="https://www.paypal.com/donate?hosted_button_id=…" />
+      </div>
+      <div class="form-group">
+        <label>${t("bank_name","Banque")}</label>
+        <input type="text" id="cfg-don-bank" placeholder="${t("bank_name","Banque")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("donation_iban","IBAN")}</label>
+        <input type="text" id="cfg-don-iban" placeholder="FR76 1234 5678 …" />
+      </div>
+      <div class="form-group">
+        <label>${t("donation_text","Texte / montants (optionnel)")}</label>
+        <textarea id="cfg-don-text" rows="2" placeholder="${t("donation_text","Texte")}"></textarea>
+      </div>
+      <button class="btn btn-primary btn-block" id="save-settings">${t("save","Enregistrer")}</button>
+    </div>
+  `);try{const e=await u("/api/admin/config");e&&(e.name&&(document.getElementById("cfg-name").value=e.name),e.city&&(document.getElementById("cfg-city").value=e.city),e.prayer_method&&(document.getElementById("cfg-method").value=e.prayer_method),e.default_language&&(document.getElementById("cfg-lang").value=e.default_language),e.donation&&(e.donation.title&&(document.getElementById("cfg-don-title").value=e.donation.title),e.donation.paypal&&(document.getElementById("cfg-don-paypal").value=e.donation.paypal),e.donation.bankName&&(document.getElementById("cfg-don-bank").value=e.donation.bankName),e.donation.iban&&(document.getElementById("cfg-don-iban").value=e.donation.iban),e.donation.text&&(document.getElementById("cfg-don-text").value=e.donation.text)))}catch{}document.getElementById("save-settings").onclick=async()=>{const e={name:document.getElementById("cfg-name").value.trim(),city:document.getElementById("cfg-city").value.trim(),prayer_method:document.getElementById("cfg-method").value,default_language:document.getElementById("cfg-lang").value,donation:{title:document.getElementById("cfg-don-title").value.trim(),paypal:document.getElementById("cfg-don-paypal").value.trim(),bankName:document.getElementById("cfg-don-bank").value.trim(),iban:document.getElementById("cfg-don-iban").value.trim(),text:document.getElementById("cfg-don-text").value.trim()}};try{await u("/api/admin/config",{method:"PUT",body:e}),p(t("settings_saved","Paramètres enregistrés"),"success")}catch(n){p(n.message,"error")}}}async function Lt(){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/admin" class="btn btn-sm btn-secondary">← ${t("back_to_dashboard","Retour au tableau de bord")}</a>
+      <h2>📢 ${t("announcements","Annonces")}</h2>
+    </div>
+
+    <div class="card" style="max-width:500px; margin-bottom:16px;">
+      <h3 class="card-header">➕ ${t("new_announcement","Nouvelle annonce")}</h3>
+      <div class="form-group">
+        <label>${t("title","Titre")}</label>
+        <input type="text" id="ann-title" placeholder="${t("announcement_title","Titre de l'annonce")}" />
+      </div>
+      <div class="form-group">
+        <label>${t("body","Contenu")}</label>
+        <textarea id="ann-body" rows="4" placeholder="${t("announcement_body","Texte de l'annonce...")}" style="width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--bg2); color:var(--fg);"></textarea>
+      </div>
+      <div style="display:flex; gap:12px;">
+        <div class="form-group" style="flex:1;">
+          <label>${t("category","Catégorie")}</label>
+          <select id="ann-category">
+            <option value="general">${t("general","Général")}</option>
+            <option value="prayer">${t("prayer","Prière")}</option>
+            <option value="event">${t("event","Événement")}</option>
+            <option value="urgent">${t("urgent","Urgent")}</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>${t("priority","Priorité")}</label>
+          <select id="ann-priority">
+            <option value="low">${t("low","Basse")}</option>
+            <option value="normal" selected>${t("normal","Normale")}</option>
+            <option value="high">${t("high","Haute")}</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="create-ann">${t("publish","Publier")}</button>
+    </div>
+
+    <div id="ann-list"><div class="loading-center"><div class="spinner"></div></div></div>
+  `);let e=null;async function n(){var i;const a=document.getElementById("ann-list");try{const o=await u("/api/mosques");if(e=(i=o==null?void 0:o[0])==null?void 0:i.id,!e){a.innerHTML=`<div class="card" style="text-align:center; color:var(--muted); padding:24px;">${t("no_mosques","Aucune mosquée configurée")}</div>`;return}const s=await u(`/api/announcements/${e}`);if(!s.length){a.innerHTML=`<div class="card" style="text-align:center; color:var(--muted); padding:24px;">${t("no_announcements","Aucune annonce")}</div>`;return}a.innerHTML=`<div class="card-grid">${s.map(r=>`
+        <div class="card" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <div style="flex:1;">
+            <div style="font-weight:600;">${r.title}</div>
+            <div style="font-size:0.85em; color:var(--muted); margin-top:4px; white-space:pre-line;">${r.body||""}</div>
+            <div style="margin-top:8px; display:flex; gap:8px; font-size:0.8em;">
+              <span style="background:var(--bg2); padding:2px 8px; border-radius:6px;">${r.category||"general"}</span>
+              <span style="background:var(--bg2); padding:2px 8px; border-radius:6px;">${r.priority||"normal"}</span>
+              ${r.created_at?`<span style="color:var(--muted);">${new Date(r.created_at).toLocaleDateString("fr-FR")}</span>`:""}
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm delete-ann" data-id="${r.id}">🗑️</button>
+        </div>
+      `).join("")}</div>`,a.querySelectorAll(".delete-ann").forEach(r=>{r.onclick=async()=>{if(confirm(t("confirm_delete_announcement","Supprimer cette annonce ?")))try{await u(`/api/announcements/${e}/${r.dataset.id}`,{method:"DELETE"}),p(t("deleted","Supprimé"),"success"),n()}catch(l){p(l.message,"error")}}})}catch(o){a.innerHTML=`<div class="card" style="color:var(--danger);">${o.message}</div>`}}n(),document.getElementById("create-ann").onclick=async()=>{if(!e){p(t("no_mosques","Aucune mosquée configurée"),"error");return}const a=document.getElementById("ann-title").value.trim(),i=document.getElementById("ann-body").value.trim(),o=document.getElementById("ann-category").value,s=document.getElementById("ann-priority").value;if(!a){p(t("title_required","Titre requis"),"error");return}try{await u(`/api/announcements/${e}`,{method:"POST",body:{title:a,body:i,category:o,priority:s}}),p(t("announcement_created","Annonce publiée"),"success"),document.getElementById("ann-title").value="",document.getElementById("ann-body").value="",n()}catch(r){p(r.message,"error")}}}const jt=Object.freeze(Object.defineProperty({__proto__:null,renderAdmin:kt},Symbol.toStringTag,{value:"Module"}));async function Mt(e){var i;const n=e==null?void 0:e.mosqueId;h(`
+    <div class="card">
+      <h2 class="card-header">📢 ${t("announcements","Annonces")}</h2>
+      ${B("۞")}
+      <div id="announcements-list" class="loading-center"><div class="spinner"></div></div>
+    </div>
+  `);let a=n||null;if(!a)try{const o=await u("/api/mosques",{auth:!1});a=((i=o==null?void 0:o[0])==null?void 0:i.id)||null}catch{a=null}if(a)try{const o=await u(`/api/announcements/${a}`,{auth:!1});Pt(o)}catch{const s=document.getElementById("announcements-list");s.className="",s.innerHTML=`<p style="color:var(--muted); text-align:center; padding:20px;">${t("no_announcements","Aucune annonce pour le moment")}</p>`}else{const o=document.getElementById("announcements-list");o.className="",o.innerHTML=`
+      <p style="color:var(--muted); text-align:center; padding:20px;">
+        ${t("select_mosque","Sélectionnez une mosquée pour voir les annonces")}
+      </p>
+    `}}function Pt(e){const n=document.getElementById("announcements-list");if(!n)return;if(n.className="",!(e!=null&&e.length)){n.innerHTML=`<p style="color:var(--muted); text-align:center;">${t("no_announcements","Aucune annonce")}</p>`;return}const a=o=>(o.priority==="urgent"?2:0)+(o.pinned?1:0),i=[...e].sort((o,s)=>{const r=a(s)-a(o);return r!==0?r:new Date(s.publishedAt||0)-new Date(o.publishedAt||0)});n.innerHTML=i.map(o=>`
+    <div class="announcement-item ${o.priority==="urgent"?"urgent":""}">
+      <div class="title">
+        ${o.priority==="urgent"?"🔴 ":o.pinned?"📌 ":""}${o.title}
+      </div>
+      <div class="body">${o.body}</div>
+      <div class="meta">
+        ${o.publishedAt?new Date(o.publishedAt).toLocaleDateString(S()):""}
+        ${o.category?` · ${o.category}`:""}
+      </div>
+    </div>
+  `).join("")}const Ct=Object.freeze(Object.defineProperty({__proto__:null,renderAnnouncements:Mt},Symbol.toStringTag,{value:"Module"}));async function Nt(e){const n=(e==null?void 0:e.action)||"login";h(`
+    <div class="card" style="max-width:420px; margin:40px auto;">
+      <h2 class="card-header" style="justify-content:center;">
+        🕌 ${n==="register"?t("register","Créer un compte"):t("login","Connexion")}
+      </h2>
+
+      <form id="auth-form">
+        ${n==="register"?`
+          <div class="form-group">
+            <label>${t("name","Nom")}</label>
+            <input type="text" name="name" required placeholder="${t("your_name","Votre nom")}" />
+          </div>
+        `:""}
+
+        <div class="form-group">
+          <label>${t("email","Email")}</label>
+          <input type="email" name="email" required placeholder="email@mosquee.org" />
+        </div>
+
+        <div class="form-group">
+          <label>${t("password","Mot de passe")}</label>
+          <div style="position:relative;">
+            <input type="password" name="password" id="auth-password" required minlength="8" placeholder="••••••••" style="padding-right:44px;" />
+            <button type="button" id="toggle-password" class="icon-btn" style="position:absolute; right:2px; top:50%; transform:translateY(-50%); width:34px; height:34px;" title="${t("show_password","Afficher le mot de passe")}" aria-label="${t("show_password","Afficher le mot de passe")}">👁</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="auth-submit">
+          ${n==="register"?t("create_account","Créer le compte"):t("login_btn","Se connecter")}
+        </button>
+      </form>
+
+      <div style="text-align:center; margin-top:16px;">
+        ${n==="register"?`<a href="#/auth/login">${t("have_account","Déjà un compte ? Se connecter")}</a>`:`<a href="#/auth/register">${t("no_account","Pas de compte ? Créer un compte")}</a>`}
+      </div>
+    </div>
+  `),document.getElementById("toggle-password").onclick=()=>{const a=document.getElementById("auth-password"),i=document.getElementById("toggle-password"),o=a.type==="password";a.type=o?"text":"password",i.textContent=o?"🙈":"👁"},document.getElementById("auth-form").onsubmit=async a=>{a.preventDefault();const i=new FormData(a.target),o=document.getElementById("auth-submit");o.disabled=!0,o.textContent="⏳ ...";try{const s=Object.fromEntries(i),l=await u(n==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",body:s,auth:!1});ct(l.accessToken,l.refreshToken),localStorage.setItem("userName",l.user.name),p(t("welcome","Bienvenue")+", "+l.user.name+" !","success"),et("/")}catch(s){p(s.message,"error"),o.disabled=!1,o.textContent=n==="register"?t("create_account","Créer le compte"):t("login_btn","Se connecter")}}}const zt=Object.freeze(Object.defineProperty({__proto__:null,renderAuth:Nt},Symbol.toStringTag,{value:"Module"}));async function Dt(e){var l,d,c,m,y,$,b;const n=e==null?void 0:e.mosqueId;h(`
+    <div style="min-height:80vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
+      <div style="font-size:4em; margin-bottom:12px;">🕌</div>
+      <h1 style="font-size:2em; margin-bottom:24px;">Mosqué Digital</h1>
+
+      <div style="font-size:1.3em; color:var(--accent2); margin-bottom:24px;" id="display-hijri">…</div>
+
+      <div id="display-prayer" style="margin-bottom:30px;">
+        <div style="font-size:1.2em; color:var(--muted);" id="display-prayer-name">${t("loading","...")}</div>
+        <div style="font-size:4em; font-weight:700; color:var(--accent);" id="display-prayer-time">--:--</div>
+        <div style="font-size:1.2em; color:var(--muted);" id="display-countdown"></div>
+      </div>
+
+      <div style="width:100%; max-width:600px; border-top:1px solid var(--line); padding-top:20px;">
+        <div style="color:var(--muted);" id="display-next-activity">${t("loading","...")}</div>
+      </div>
+
+      <div style="position:fixed; bottom:16px; right:16px; color:var(--muted); font-size:0.8em;" id="display-clock"></div>
+    </div>
+  `);let a=n||null;if(!a)try{const g=await u("/api/mosques",{auth:!1});a=((l=g==null?void 0:g[0])==null?void 0:l.id)||null}catch{a=null}u("/api/hijri",{auth:!1}).then(g=>{const f=document.getElementById("display-hijri");f&&(g!=null&&g.hijri)&&(f.textContent=`${g.hijri.day} ${g.hijri.monthNameFr} ${g.hijri.year} AH`)}).catch(()=>{});let i=null;if(a)try{const g=new Date().toISOString().split("T")[0];i=await u(`/api/prayer-times/${a}?date=${g}`,{auth:!1})}catch{i=null}const o=i?[{name:t("fajr","Fajr"),time:((d=i.fajr)==null?void 0:d.time)||"--:--"},{name:t("sunrise","Sunrise"),time:((c=i.sunrise)==null?void 0:c.time)||"--:--"},{name:t("dhuhr","Dhuhr"),time:((m=i.dhuhr)==null?void 0:m.time)||"--:--"},{name:t("asr","Asr"),time:((y=i.asr)==null?void 0:y.time)||"--:--"},{name:t("maghrib","Maghrib"),time:(($=i.maghrib)==null?void 0:$.time)||"--:--"},{name:t("isha","Isha"),time:((b=i.isha)==null?void 0:b.time)||"--:--"}]:[{name:"Fajr",time:"05:30"},{name:"Dhuhr",time:"13:00"},{name:"Asr",time:"16:30"},{name:"Maghrib",time:"19:45"},{name:"Isha",time:"21:15"}];a&&u(`/api/events/upcoming/${a}?limit=1`,{auth:!1}).then(g=>{const f=document.getElementById("display-next-activity");if(!f)return;const x=g==null?void 0:g[0];if(!x){f.textContent="";return}let I="";x.date&&(I=new Date(x.date+(x.time?"T"+x.time:"")).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),x.time&&(I+=" à "+x.time)),f.innerHTML=`<div style="font-size:0.9em; color:var(--muted);">${t("next_activity","Prochain temps fort")}</div>
+                        <div style="font-size:1.6em; font-weight:700; margin-top:4px;">${x.title}</div>
+                        ${I?`<div style="color:var(--accent); margin-top:4px;">${I}</div>`:""}`}).catch(()=>{});function s(){const g=new Date,f=document.getElementById("display-clock");f&&(f.textContent=g.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}))}s(),setInterval(s,1e4);function r(){const g=new Date,f=g.getHours()*60+g.getMinutes();let x=o[0];for(const K of o){const[me,Ye]=K.time.split(":").map(Number);if(!isNaN(me)&&me*60+Ye>f){x=K;break}}const[I,j]=x.time.split(":").map(Number),M=Math.max(0,(isNaN(I)?0:I*60+(isNaN(j)?0:j))-f),P=Math.floor(M/60),F=M%60;document.getElementById("display-prayer-name").textContent=x.name,document.getElementById("display-prayer-time").textContent=x.time,document.getElementById("display-countdown").textContent=x.time!=="--:--"?`IQAMA DANS ${P>0?P+"H":""}${F.toString().padStart(2,"0")}`:""}r(),setInterval(r,3e4)}const Ht=Object.freeze(Object.defineProperty({__proto__:null,renderDisplay:Dt},Symbol.toStringTag,{value:"Module"})),Ot={prayer:"🕌",quran:"📖",course:"🎓",ramadan:"🌙",conference:"🎤",family:"👨‍👩‍👧",children:"🧒",community:"🤝"};function Z(e){return e.startTime?new Date(e.startTime):e.date?new Date(e.date+(e.time?"T"+e.time:"")):null}function Rt(e){if(!e||isNaN(e))return"";const n=i=>new Date(i.getFullYear(),i.getMonth(),i.getDate()),a=Math.round((n(e)-n(new Date))/864e5);return a===0?t("today","Aujourd'hui"):a===1?t("tomorrow","Demain"):""}async function Ft(e){var i;const n=e==null?void 0:e.mosqueId;h(`
+    <div class="card">
+      <h2 class="card-header">📅 ${t("events","Événements")}</h2>
+      ${B("۞")}
+      <div id="events-list" class="loading-center"><div class="spinner"></div></div>
+    </div>
+  `);let a=n||null;if(!a)try{const o=await u("/api/mosques",{auth:!1});a=((i=o==null?void 0:o[0])==null?void 0:i.id)||null}catch{a=null}if(a)try{const o=await u(`/api/events/${a}`,{auth:!1});Kt(o)}catch{ae()}else ae()}function ae(){const e=document.getElementById("events-list");e.className="",e.innerHTML=`
+    <p style="color:var(--muted); text-align:center; padding:20px;">
+      ${t("no_events","Aucun événement à venir")}
+    </p>`}function Kt(e){const n=document.getElementById("events-list");if(!n)return;if(n.className="",!(e!=null&&e.length)){ae();return}const a=[...e].sort((i,o)=>(Z(i)||0)-(Z(o)||0));n.innerHTML=a.map(i=>{const o=Z(i),s=Rt(o);let r="";return i.startTime?r=o.toLocaleDateString(S())+" "+o.toLocaleTimeString(S(),{hour:"2-digit",minute:"2-digit"}):i.date?r=o.toLocaleDateString(S())+(i.time?" "+t("at","à")+" "+i.time:""):i.time&&(r="à "+i.time),`
+    <div class="card card-accent" style="padding:16px; display:flex; gap:16px; align-items:start;">
+      ${i.image?`<img src="${i.image}" style="width:80px; height:80px; object-fit:cover; border-radius:12px; flex-shrink:0;" onerror="this.style.display='none'" />`:`<span class="icon-badge" style="font-size:1.6em;">${Ot[i.category]||"📅"}</span>`}
+      <div style="flex:1;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div style="font-weight:600;">${i.title}</div>
+          ${s?`<span class="badge-live live">${s}</span>`:""}
+        </div>
+        ${i.description?`<div style="color:var(--muted); margin-top:4px;">${i.description}</div>`:""}
+        <div style="font-size:0.85em; color:var(--accent); margin-top:8px;">
+          📅 ${r}
+          ${i.location?` · 📍 ${i.location}`:""}
+          ${i.speaker?` · 🎤 ${i.speaker}`:""}
+        </div>
+      </div>
+    </div>
+  `}).join("")}const Ut=Object.freeze(Object.defineProperty({__proto__:null,renderEvents:Ft},Symbol.toStringTag,{value:"Module"}));let N=null,V=null;const be=[{ar:"سُبْحَانَ اللَّهِ وَبِحَمْدِهِ",fr:"Gloire et pureté à Allah, et louange à Lui.",en:"Glory and praise be to Allah."},{ar:"لَا إِلَٰهَ إِلَّا اللَّهُ",fr:"Il n'y a de divinité digne d'adoration qu'Allah.",en:"There is no deity worthy of worship but Allah."},{ar:"الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",fr:"Louange à Allah, Seigneur des mondes.",en:"Praise be to Allah, Lord of the worlds."},{ar:"اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ",fr:"Ô Allah, prie sur Muhammad ﷺ.",en:"O Allah, send blessings upon Muhammad ﷺ."},{ar:"رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً",fr:"Seigneur, accorde-nous belle part ici-bas et belle part dans l'au-delà.",en:"Our Lord, grant us good in this world and good in the Hereafter."},{ar:"حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",fr:"Allah nous suffit, Il est le meilleur garant.",en:"Allah is sufficient for us, and He is the best disposer of affairs."},{ar:"أَسْتَغْفِرُ اللَّهَ",fr:"Je demande pardon à Allah.",en:"I seek forgiveness from Allah."},{ar:"وَقُل رَّبِّ زِدْنِي عِلْمًا",fr:"Et dis : « Seigneur, accrois mes connaissances. »",en:'And say: "My Lord, increase me in knowledge."'}];function Vt(){const e=Math.floor(Date.now()/864e5),n=be[e%be.length],a=R(),i=a==="ar"?null:n[a]||n.en||n.fr;return{ar:n.ar,translation:i}}function Gt(e){return e<5?["greeting_night","Que cette nuit vous soit bénie"]:e<12?["greeting_morning","Que votre matinée soit bénie"]:e<18?["greeting_afternoon","Que votre journée soit bénie"]:["greeting_evening","Que votre soirée soit bénie"]}async function Jt(){N&&(clearInterval(N),N=null);const e=localStorage.getItem("userName")||"",[n,a]=Gt(new Date().getHours()),i=Vt(),o=[{href:"#/khutbah",icon:"🎙️",titleKey:"khutbah_live",title:"Khutbah Live",subKey:"join_or_start",sub:"Rejoindre ou démarrer"},{href:"#/quran",icon:"📖",titleKey:"quran",title:"Coran",subKey:"read_listen",sub:"Lire et écouter"},{href:"#/prayer",icon:"🕌",titleKey:"prayers",title:"Horaires de prière",subKey:"adhan_iqama",sub:"Adhan & Iqama"},{href:"#/announcements",icon:"📢",titleKey:"announcements",title:"Annonces",subKey:"latest_news",sub:"Dernières nouvelles"},{href:"#/events",icon:"📅",titleKey:"events",title:"Événements",subKey:"upcoming",sub:"À venir"},{href:"#/support",icon:"🤲",titleKey:"donate",title:"Faire un don",subKey:"support_mosque",sub:"Soutenir la mosquée"},{href:"#/ramadan",icon:"🌙",titleKey:"ramadan",title:"Ramadan",subKey:"program",sub:"Programme"}];h(`
+    <div class="hero-mosque">
+      <div class="bismillah">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</div>
+      <h1 style="font-size:1.6em; margin:10px 0 4px;">${t("app_name","Mosqué Digital")}</h1>
+      <p style="color:var(--muted);">
+        ${e?`${t("assalamu_alaykum","As-salâmu ʿalaykum")}, <strong style="color:var(--fg)">${e}</strong> — ${t(n,a)}`:`${t("assalamu_alaykum","As-salâmu ʿalaykum")} — ${t(n,a)}`}
+      </p>
+      <p style="color:var(--accent2); font-size:1.05em; margin-top:2px;" id="home-hijri"></p>
+    </div>
+
+    <div id="install-banner"></div>
+
+    <div id="prayer-countdown" class="card" style="margin-bottom:8px;">
+      <div class="loading-center"><div class="spinner"></div></div>
+    </div>
+
+    <div class="card card-accent" style="text-align:center;">
+      <div class="bismillah" style="font-size:1.15em;" dir="rtl">${i.ar}</div>
+      ${i.translation?`<div style="color:var(--muted); font-size:.92em; margin-top:6px;">${i.translation}</div>`:""}
+    </div>
+
+    ${B("✦ ✦ ✦")}
+
+    <div class="card-grid">
+      ${o.map(r=>`
+        <a href="${r.href}" class="card card-link" style="display:flex; align-items:center; gap:16px; text-decoration:none; color:var(--fg);">
+          <span class="icon-badge">${r.icon}</span>
+          <div>
+            <div style="font-weight:600;">${t(r.titleKey,r.title)}</div>
+            <div style="font-size:0.85em; color:var(--muted);">${t(r.subKey,r.sub)}</div>
+          </div>
+        </a>
+      `).join("")}
+    </div>
+
+    ${Y()?`
+      <div style="text-align:center; margin-top:24px;">
+        <a href="#/admin" class="btn btn-secondary">${t("admin","Administration")}</a>
+        <a href="#/imam" class="btn btn-secondary" style="margin-left:8px;">${t("imam_mode","Mode Imam")}</a>
+      </div>
+    `:`
+      <div style="text-align:center; margin-top:24px;">
+        <a href="#/auth/login" class="btn btn-primary">${t("login","Connexion")}</a>
+        <a href="#/admin" class="btn btn-secondary" style="margin-left:8px;">${t("admin","Administration")}</a>
+      </div>
+    `}
+  `),xe(),V&&window.removeEventListener("pwa-installable-changed",V),V=xe,window.addEventListener("pwa-installable-changed",V);const s=new Date().toISOString().split("T")[0];u(`/api/hijri?date=${s}`,{auth:!1}).then(r=>{const l=document.getElementById("home-hijri");if(l&&(r!=null&&r.hijri)){const d=R()==="ar",c=d?r.hijri.monthNameAr:r.hijri.monthNameFr;l.textContent=d?`${r.hijri.day} ${c} ${r.hijri.year} هـ`:`${r.hijri.day} ${c} ${r.hijri.year} AH (${r.hijri.monthNameAr})`}}).catch(()=>{}),Qt()}function xe(){const e=document.getElementById("install-banner");if(!e)return;if(localStorage.getItem("pwa-banner-dismissed")==="1"||!gt()){e.innerHTML="";return}e.innerHTML=`
+    <div class="card card-accent" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+      <span class="icon-badge">📲</span>
+      <div style="flex:1; min-width:180px;">
+        <div style="font-weight:600;">${t("install_app","Installer l'application")}</div>
+        <div style="font-size:.85em; color:var(--muted);">
+          ${Ne()?t("install_ios_hint","Partager (⬆️) puis « Sur l'écran d'accueil »"):t("install_hint","Accès rapide, plein écran, fonctionne hors-ligne")}
+        </div>
+      </div>
+      ${ze()?`<button class="btn btn-sm btn-primary" id="btn-install">${t("install","Installer")}</button>`:""}
+      <button class="icon-btn" id="btn-dismiss-install" title="${t("dismiss","Ignorer")}" aria-label="${t("dismiss","Ignorer")}">✕</button>
+    </div>
+  `;const n=document.getElementById("btn-install");n&&(n.onclick=async()=>{await ht()==="accepted"&&(e.innerHTML="")}),document.getElementById("btn-dismiss-install").onclick=()=>{localStorage.setItem("pwa-banner-dismissed","1"),e.innerHTML=""}}let E=null;async function Qt(){var e;try{const n=await u("/api/mosques",{auth:!1}),a=(e=n==null?void 0:n[0])==null?void 0:e.id;if(a){const i=new Date().toISOString().split("T")[0];E=await u(`/api/prayer-times/${a}?date=${i}`,{auth:!1})}}catch{E=null}$e(),N=setInterval($e,6e4)}function $e(){var g,f,x,I,j,M;const e=document.getElementById("prayer-countdown");if(!e){clearInterval(N);return}const n=new Date,a=n.getHours(),i=n.getMinutes(),o=`${a.toString().padStart(2,"0")}:${i.toString().padStart(2,"0")}`,s=E?[{name:t("fajr","Fajr"),time:((g=E.fajr)==null?void 0:g.time)||"--:--"},{name:t("sunrise","Sunrise"),time:((f=E.sunrise)==null?void 0:f.time)||"--:--"},{name:t("dhuhr","Dhuhr"),time:((x=E.dhuhr)==null?void 0:x.time)||"--:--"},{name:t("asr","Asr"),time:((I=E.asr)==null?void 0:I.time)||"--:--"},{name:t("maghrib","Maghrib"),time:((j=E.maghrib)==null?void 0:j.time)||"--:--"},{name:t("isha","Isha"),time:((M=E.isha)==null?void 0:M.time)||"--:--"}]:[{name:"Fajr",time:"05:30"},{name:"Sunrise",time:"07:15"},{name:"Dhuhr",time:"13:00"},{name:"Asr",time:"16:30"},{name:"Maghrib",time:"19:45"},{name:"Isha",time:"21:15"}];let r=null;for(const P of s){const[F,K]=P.time.split(":").map(Number);if(F>a||F===a&&K>i){r=P;break}}r||(r=s[0]);const[l,d]=r.time.split(":").map(Number);let c=l*60+d-(a*60+i);c<0&&(c+=24*60);const m=Math.floor(c/60),y=c%60,$=m>0?`${m}h${y.toString().padStart(2,"0")}`:`${y}min`,b=Math.max(4,Math.min(100,Math.round(c/(6*60)*100)));e.className="card",e.innerHTML=`
+    <div style="display:flex; align-items:center; justify-content:center; gap:24px; flex-wrap:wrap; padding:8px 0;">
+      <div class="gauge" style="--gauge-pct:${b};">
+        <div class="gauge-inner">
+          <div class="timer">${$}</div>
+          <div class="label">${t("remaining","restant")}</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">${t("next_prayer","Prochaine prière")}</div>
+        <div class="next-prayer">${r.name}</div>
+        <div class="label">${t("at","à")} ${r.time} · ${o}</div>
+      </div>
+    </div>
+  `}const Wt=Object.freeze(Object.defineProperty({__proto__:null,renderHome:Jt},Symbol.toStringTag,{value:"Module"})),ee={};function Yt(){return Ce.replace(/^http/,"ws")}function Ue(e="/khutbah"){if(ee[e])return ee[e];const n={_handlers:{},_ws:null,_reconnectTimer:null,_mode:null,_code:null,_lang:null,_token:null,on(a,i){return(this._handlers[a]=this._handlers[a]||[]).push(i),this},_dispatch(a,i){(this._handlers[a]||[]).forEach(o=>{try{o(i)}catch(s){console.error("[ws]",s)}})},_connect(){if(this._ws){try{this._ws.close()}catch{}this._ws=null}const a=this._mode==="broadcast"?`/ws/broadcast/${encodeURIComponent(this._code)}?token=${encodeURIComponent(this._token||"")}`:`/ws/listen/${encodeURIComponent(this._code)}?lang=${encodeURIComponent(this._lang||"fr")}`,i=new WebSocket(Yt()+a);this._ws=i,i.onopen=()=>{this._dispatch("connect",{})},i.onmessage=o=>{let s;try{s=JSON.parse(o.data)}catch{return}this._dispatch(s.type,s)},i.onclose=()=>{this._ws=null,this._dispatch("disconnect",{}),this._mode&&this._scheduleReconnect()},i.onerror=()=>{}},_scheduleReconnect(){this._reconnectTimer||(this._reconnectTimer=setTimeout(()=>{this._reconnectTimer=null,this._mode&&this._connect()},2e3))},emit(a,i={}){return a==="join-listen"?(this._mode="listen",this._code=i.code,this._lang=i.lang||"fr",this._connect(),this):a==="join-broadcast"?(this._mode="broadcast",this._code=i.code,this._token=i.token||"",this._connect(),this):(this._ws&&this._ws.readyState===WebSocket.OPEN&&this._ws.send(JSON.stringify({type:a,...i})),this)},disconnect(){if(this._mode=null,this._reconnectTimer&&(clearTimeout(this._reconnectTimer),this._reconnectTimer=null),this._ws){try{this._ws.close()}catch{}this._ws=null}this._handlers={}}};return ee[e]=n,n}function Xt(e){try{return localStorage.getItem(`imam_token_${e}`)||""}catch{return""}}function Ve(e,n){try{localStorage.setItem(`imam_token_${e}`,n)}catch{}}const _e=["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ","الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ","اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ","يَا أَيُّهَا الَّذِينَ آمَنُوا","أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ","قَالَ اللَّهُ تَعَالَى","قَالَ رَسُولُ اللَّهِ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ","أَقُولُ قَوْلِي هَذَا وَأَسْتَغْفِرُ اللَّهَ لِي وَلَكُمْ","اللَّهُمَّ اغْفِرْ لِلْمُؤْمِنِينَ وَالْمُؤْمِنَاتِ","رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ","أَقِيمُوا الصَّلَاةَ","وَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ"];function te(){try{const e=JSON.parse(localStorage.getItem("khutbah-phrases")||"null");return Array.isArray(e)&&e.length?e:_e}catch{return _e}}function we(e){localStorage.setItem("khutbah-phrases",JSON.stringify(e))}async function Zt(e){if(!Y()){h(`
+      <div class="card" style="max-width:420px; margin:40px auto; text-align:center;">
+        <h2>👳 ${t("imam_mode","Mode Imam")}</h2>
+        <p style="color:var(--muted); margin:12px 0;">${t("login_required","Connexion requise")}</p>
+        <a href="#/auth/login" class="btn btn-primary">${t("login","Se connecter")}</a>
+      </div>
+    `);return}const n=e==null?void 0:e.code;n?await tn(n):await en()}async function en(){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/" class="btn btn-sm btn-secondary">←</a>
+      <h2>👳 ${t("imam_dashboard","Tableau de bord Imam")}</h2>
+    </div>
+
+    <div class="card">
+      <h3 class="card-header">🎙️ ${t("khutbah_control","Contrôle Khutbah")}</h3>
+      <div class="form-group">
+        <label>${t("topic","Sujet")}</label>
+        <input type="text" id="imam-topic" placeholder="${t("khutbah_topic","Sujet de la khutbah")}" />
+      </div>
+      <button class="btn btn-primary btn-block" id="start-khutbah">${t("start_session","Démarrer une session")}</button>
+    </div>
+
+    <div class="card">
+      <h3 class="card-header">🤖 ${t("ai_assistant","Assistant IA")}</h3>
+      <div class="form-group">
+        <label>${t("ask_assistant","Demander à l'assistant")}</label>
+        <textarea id="ai-question" rows="3" placeholder="${t("ai_placeholder","Préparer un plan de khutbah sur la patience...")}" style="width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--bg2); color:var(--fg);"></textarea>
+      </div>
+      <button class="btn btn-primary" id="ai-generate">${t("generate","Générer")}</button>
+      <div id="ai-result" style="margin-top:16px;"></div>
+    </div>
+  `),document.getElementById("start-khutbah").onclick=async()=>{const e=document.getElementById("imam-topic").value.trim();try{const n=await u("/api/session",{method:"POST",body:{mosque_name:e,target_langs:["fr","en"]}});n.broadcaster_token&&Ve(n.code,n.broadcaster_token),p(`${t("session_created","Session créée")}: ${n.code}`,"success"),location.hash=`#/imam/${n.code}`}catch(n){p(n.message,"error")}},document.getElementById("ai-generate").onclick=async()=>{var a,i,o;const e=document.getElementById("ai-question").value.trim();if(!e)return;const n=document.getElementById("ai-result");n.innerHTML='<div class="loading-center"><div class="spinner"></div></div>';try{const s=await u("/api/ai/assistant/plan",{method:"POST",body:{topic:e}});n.innerHTML=`
+        <div class="card" style="background:var(--bg2);">
+          <h4>📋 ${s.topic||e}</h4>
+          <div style="margin-top:8px;"><strong>${t("introduction","Introduction")}:</strong><p>${s.introduction}</p></div>
+          ${(a=s.mainPoints)!=null&&a.length?`<div style="margin-top:8px;"><strong>${t("main_points","Points principaux")}:</strong><ul>${s.mainPoints.map(r=>`<li>${r}</li>`).join("")}</ul></div>`:""}
+          ${(i=s.references)!=null&&i.length?`<div style="margin-top:8px;"><strong>${t("references","Références")}:</strong><ul>${s.references.map(r=>`<li>📖 ${r}</li>`).join("")}</ul></div>`:""}
+          ${s.conclusion?`<div style="margin-top:8px;"><strong>${t("conclusion","Conclusion")}:</strong><p>${s.conclusion}</p></div>`:""}
+          ${(o=s.warnings)!=null&&o.length?`<div style="margin-top:8px; color:var(--warn);"><strong>⚠️ ${t("verify","À vérifier")}:</strong><ul>${s.warnings.map(r=>`<li>${r}</li>`).join("")}</ul></div>`:""}
+        </div>
+      `}catch(s){n.innerHTML=`<p style="color:var(--danger);">${s.message}</p>`}}}async function tn(e){h(`
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+      <a href="#/imam" class="btn btn-sm btn-secondary">←</a>
+      <span style="font-weight:600; font-family:var(--font-heading);">👳 ${t("imam_control","Contrôle Imam")}</span>
+      <span id="imam-status" class="badge-live" style="margin-left:auto;">⏳</span>
+    </div>
+
+    <div class="card" style="text-align:center;">
+      <h3 class="card-header" style="justify-content:center;">📱 ${t("qr_session","QR Code de la session")}</h3>
+      <img src="${W}/api/session/${e}/qr.png" style="width:200px; margin:16px auto; border-radius:12px; background:#fff; padding:8px;" id="imam-qr-img" />
+      <div style="font-size:0.85em; color:var(--muted); word-break:break-all;" id="join-url"></div>
+      <button class="btn btn-sm btn-secondary" id="copy-join-url" style="margin-top:10px;">📋 ${t("copy_link","Copier le lien")}</button>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="btn btn-primary" id="btn-pause">⏸ ${t("pause","Pause")}</button>
+        <button class="btn btn-secondary" id="btn-resume">▶ ${t("resume","Reprendre")}</button>
+        <button class="btn btn-danger" id="btn-stop">⏹ ${t("stop","Terminer")}</button>
+      </div>
+
+      <div class="form-group">
+        <label>📚 ${t("phrase_library","Bibliothèque de phrases")}</label>
+        <div id="phrase-chips" dir="rtl" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="new-phrase" dir="rtl" placeholder="${t("add_phrase","Ajouter une phrase...")}" style="flex:1; direction:rtl; text-align:right; font-family:var(--font-arabic);" />
+          <button class="btn btn-sm btn-secondary" id="add-phrase" title="${t("add","Ajouter")}">+</button>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="reset-phrases" style="margin-top:6px; font-size:.78em;">${t("reset_defaults","Rétablir la liste par défaut")}</button>
+      </div>
+
+      <div class="form-group">
+        <label>${t("type_arabic","Saisir du texte arabe")}</label>
+        <textarea id="manual-text" rows="3" placeholder="${t("arabic_placeholder","Texte arabe...")}" style="direction:rtl; text-align:right; font-family:var(--font-arabic); font-size:1.2em;"></textarea>
+      </div>
+      <button class="btn btn-primary btn-block" id="send-text">${t("send","Envoyer")}</button>
+    </div>
+
+    <div class="card">
+      <h4 class="card-header">📊 ${t("live_stats","Statistiques en direct")}</h4>
+      <div id="imam-stats" style="color:var(--muted);">${t("listeners","Auditeurs")}: <span id="listener-count">0</span></div>
+      <div id="imam-quran" style="margin-top:8px;"></div>
+    </div>
+
+    ${B("۞")}
+
+    <div class="card">
+      <h4 class="card-header">📝 ${t("segments","Segments")}</h4>
+      <div id="imam-segments" style="max-height:40vh; overflow-y:auto;"></div>
+    </div>
+  `);const n=Ue("/khutbah"),a=Xt(e);let i=`${window.location.origin}/#/khutbah/${e}`;try{i=(await u(`/api/session/${e}`)).join_url||i;const d=document.getElementById("join-url");d&&(d.textContent=i)}catch{const l=document.getElementById("join-url");l&&(l.textContent=i)}document.getElementById("copy-join-url").onclick=()=>{var l;(l=navigator.clipboard)==null||l.writeText(i).then(()=>p(t("copied","Copié"),"success"))};function o(l,d){const c=document.getElementById("imam-status");c&&(c.textContent=d,c.classList.toggle("live",!!l))}n.on("connect",()=>o(!1,"🟢 "+t("connected","Connecté"))),n.on("hello",l=>{o(l.status==="live",l.status==="live"?`🔴 ${t("live","LIVE")}`:`⏸ ${l.status}`),document.getElementById("listener-count").textContent=l.listeners??0}),n.on("stats",l=>{l.listeners!==void 0&&(document.getElementById("listener-count").textContent=l.listeners)}),n.on("session",l=>{o(l.status==="live",l.status==="live"?`🔴 ${t("live","LIVE")}`:`⏸ ${l.status}`)}),n.on("monitor",l=>{document.getElementById("listener-count").textContent=l.listeners??document.getElementById("listener-count").textContent,l.is_quran&&l.quran_ref&&(document.getElementById("imam-quran").innerHTML=`<div class="card" style="padding:12px; border-left:3px solid var(--accent);">📖 ${l.quran_ref}</div>`),nn(l)}),n.on("disconnect",()=>o(!1,`⚠️ ${t("disconnected","Déconnecté")}`)),document.getElementById("btn-pause").onclick=()=>n.emit("control",{action:"pause"}),document.getElementById("btn-resume").onclick=()=>n.emit("control",{action:"resume"}),document.getElementById("btn-stop").onclick=()=>n.emit("control",{action:"stop"});function s(l){l&&n.emit("transcript",{text:l,is_final:!0,manual:!0})}document.getElementById("send-text").onclick=()=>{const l=document.getElementById("manual-text").value.trim();s(l),document.getElementById("manual-text").value=""};function r(){const l=document.getElementById("phrase-chips");if(!l)return;const d=te();l.innerHTML=d.map((c,m)=>`
+      <span class="btn btn-sm btn-secondary phrase-chip" data-i="${m}" style="cursor:pointer; font-family:var(--font-arabic); gap:6px;">
+        ${c}
+        <button class="phrase-del" data-i="${m}" title="${t("delete","Supprimer")}" aria-label="${t("delete","Supprimer")}" style="background:none; border:none; color:inherit; opacity:.6; padding:0; font:inherit; cursor:pointer;">✕</button>
+      </span>
+    `).join(""),l.querySelectorAll(".phrase-chip").forEach(c=>{c.onclick=m=>{m.target.classList.contains("phrase-del")||s(d[Number(c.dataset.i)])}}),l.querySelectorAll(".phrase-del").forEach(c=>{c.onclick=m=>{m.stopPropagation();const y=te();y.splice(Number(c.dataset.i),1),we(y),r()}})}r(),document.getElementById("add-phrase").onclick=()=>{const l=document.getElementById("new-phrase"),d=l.value.trim();if(!d)return;const c=te();c.push(d),we(c),l.value="",r()},document.getElementById("new-phrase").onkeydown=l=>{l.key==="Enter"&&(l.preventDefault(),document.getElementById("add-phrase").click())},document.getElementById("reset-phrases").onclick=()=>{localStorage.removeItem("khutbah-phrases"),r(),p(t("defaults_restored","Liste par défaut rétablie"),"success")},n.emit("join-broadcast",{code:e,token:a})}function nn(e){const n=document.getElementById("imam-segments");if(!n)return;const a=document.createElement("div");a.className=`khutbah-segment ${e.is_quran?"quran":""}`,a.innerHTML=`
+    <div class="arabic">${e.arabic||""}</div>
+    <div style="font-size:0.8em; color:var(--muted);">seq #${e.seq} ${e.provider?`· ${e.provider}`:""}</div>
+  `,n.prepend(a)}const an=Object.freeze(Object.defineProperty({__proto__:null,renderImam:Zt},Symbol.toStringTag,{value:"Module"}));async function on(e){const n=e==null?void 0:e.code;n?await ln(n):await sn()}async function sn(){h(`
+    <div class="card" style="max-width:500px; margin:20px auto; text-align:center;">
+      <h2 class="card-header" style="justify-content:center;">🎙️ ${t("khutbah_live","Khutbah Live")}</h2>
+
+      <div style="background:var(--bg2); border-radius:12px; padding:20px; margin-bottom:16px;">
+        <div style="font-size:1.5em; margin-bottom:8px;">📱</div>
+        <h3 style="margin:0 0 8px;">${t("scan_qr_title","Scannez le QR Code")}</h3>
+        <p style="color:var(--muted); margin:0; line-height:1.5;">
+          ${t("scan_qr_instructions","Affichez le QR Code projeté à l'écran de la mosquée. Ouvrez l'appareil photo de votre téléphone et scannez-le pour rejoindre la session automatiquement.")}
+        </p>
+      </div>
+
+      <div style="margin:20px 0; color:var(--muted);">— ${t("or","ou")} —</div>
+
+      <div class="form-group">
+        <input type="text" id="session-code" placeholder="${t("session_code","Code de session")}"
+               maxlength="6" style="text-align:center; font-size:1.3em; letter-spacing:0.15em; text-transform:uppercase;" />
+      </div>
+
+      <button class="btn btn-primary btn-block" id="join-btn">${t("join","Rejoindre")}</button>
+    </div>
+
+    ${Y()?`
+      <div class="card" style="max-width:500px; margin:0 auto;">
+        <h3 class="card-header">👑 ${t("imam_tools","Outils Imam")}</h3>
+        <button class="btn btn-primary btn-block" id="start-session">${t("start_session","Démarrer une Khutbah")}</button>
+      </div>
+    `:""}
+  `),document.getElementById("join-btn").onclick=()=>{const e=document.getElementById("session-code").value.trim().toUpperCase();e.length>=4&&(location.hash=`#/khutbah/${e}`)},document.getElementById("session-code").onkeydown=e=>{e.key==="Enter"&&document.getElementById("join-btn").click()},document.getElementById("start-session")&&(document.getElementById("start-session").onclick=async()=>{try{const e=await u("/api/session",{method:"POST",body:{target_langs:["fr","en"]}});e.broadcaster_token&&Ve(e.code,e.broadcaster_token),p(`${t("session_created","Session créée")}: ${e.code}`,"success"),location.hash=`#/imam/${e.code}`}catch(e){p(e.message,"error")}})}const ce=[.85,1,1.15,1.35,1.6];let L=Ge(parseInt(localStorage.getItem("khutbah-fs-idx"),10)),z=localStorage.getItem("khutbah-tts")==="1",ie="fr";const D=[],rn=3;function Ge(e){return Number.isFinite(e)&&e>=0&&e<ce.length?e:1}async function ln(e){h(`
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+      <a href="#/khutbah" class="btn btn-sm btn-secondary">←</a>
+      <span style="font-weight:600; font-family:var(--font-heading);">🎙️ Khutbah Live</span>
+      <span id="khutbah-status" class="badge-live" style="margin-left:4px;">${t("connecting","Connexion...")}</span>
+      <span style="margin-left:auto; font-size:0.85em; color:var(--muted);" id="listener-count">0 👤</span>
+    </div>
+
+    <div class="card" style="padding:12px 16px; margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <select id="lang-select" style="width:auto; flex:1; min-width:140px;">
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+        <option value="nl">Nederlands</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="tr">Türkçe</option>
+        <option value="ar">العربية</option>
+      </select>
+      <button class="icon-btn" id="fs-minus" type="button" title="${t("text_smaller","Texte plus petit")}" aria-label="${t("text_smaller","Texte plus petit")}">A−</button>
+      <button class="icon-btn" id="fs-plus" type="button" title="${t("text_larger","Texte plus grand")}" aria-label="${t("text_larger","Texte plus grand")}">A+</button>
+      <button class="icon-btn" id="tts-toggle" type="button" title="${t("voice_playback","Lecture vocale")}" aria-label="${t("voice_playback","Lecture vocale")}" aria-pressed="${z}">${z?"🔊":"🔇"}</button>
+    </div>
+
+    <div id="interim-line" style="direction:rtl; text-align:right; font-family:var(--font-arabic); font-size:1.5em; color:var(--accent2); min-height:1.4em; margin-bottom:8px;"></div>
+
+    ${B("۞")}
+
+    <div id="segments" style="--khutbah-fs:${ce[L]}; max-height:60vh; overflow-y:auto; padding:4px 0 12px;"></div>
+  `);const n=Ue("/khutbah"),a=()=>document.getElementById("khutbah-status");function i(s,r){const l=a();l&&(l.textContent=r,l.classList.toggle("live",!!s))}n.on("connect",()=>i(!1,t("connected","Connecté"))),n.on("hello",s=>{var r;if(i(s.status==="live",s.status==="live"?`🔴 ${t("live","LIVE")}`:`⏸ ${s.status}`),s.seq,(r=s.history)!=null&&r.length)for(const l of s.history)Ee(l,{speak:!1})}),n.on("interim",s=>{const r=document.getElementById("interim-line");r&&(r.textContent=s.arabic||"")}),n.on("phrase",s=>{if(s.corrected){const r=document.querySelector(`[data-seq="${s.seq}"] .arabic`);r&&(r.textContent=s.arabic||r.textContent)}else Ee(s,{speak:!0}),s.seq}),n.on("session",s=>{i(s.status==="live",s.status==="live"?`🔴 ${t("live","LIVE")}`:`⏸ ${s.status}`)}),n.on("disconnect",()=>i(!1,`⚠️ ${t("disconnected","Déconnecté")} — ${t("reconnecting","Reconnexion...")}`));const o=document.getElementById("lang-select");ie=o.value,o.onchange=s=>{ie=s.target.value,oe(),n.emit("set-lang",{lang:s.target.value})},document.getElementById("fs-minus").onclick=()=>Ie(L-1),document.getElementById("fs-plus").onclick=()=>Ie(L+1),document.getElementById("tts-toggle").onclick=()=>dn(!z),n.emit("join-listen",{code:e,lang:o.value}),window.addEventListener("hashchange",oe,{once:!0})}function Ie(e){L=Ge(e),localStorage.setItem("khutbah-fs-idx",String(L));const n=document.getElementById("segments");n&&n.style.setProperty("--khutbah-fs",ce[L])}function dn(e){z=e,localStorage.setItem("khutbah-tts",e?"1":"0");const n=document.getElementById("tts-toggle");n&&(n.textContent=e?"🔊":"🔇",n.setAttribute("aria-pressed",String(e))),e||oe()}function oe(){D.length=0,window.speechSynthesis&&window.speechSynthesis.cancel()}function cn(e){!z||!e||!window.speechSynthesis||(D.length>=rn&&D.shift(),D.push(e),window.speechSynthesis.speaking||se())}function se(){const e=D.shift();if(e===void 0)return;const n=new SpeechSynthesisUtterance(e);n.lang=S(ie),n.onend=se,n.onerror=se,window.speechSynthesis.speak(n)}function Ee(e,{speak:n=!1}={}){const a=document.getElementById("segments");if(!a)return;const i=document.createElement("div");i.className=`khutbah-segment ${e.is_quran?"quran":""} ${e.degraded?"degraded":""}`,i.setAttribute("data-seq",e.seq),i.innerHTML=`
+    ${e.arabic?`<div class="arabic">${e.arabic}</div>`:""}
+    <div class="translation" style="font-size:var(--khutbah-fs, 1em);">${e.text||""}</div>
+    ${e.is_quran&&e.quran_ref?`<div style="font-size:0.8em; color:var(--accent); margin-top:4px;">📖 ${e.quran_ref}</div>`:""}
+    ${e.degraded?`<div style="font-size:0.75em; color:var(--warn);">⚠️ ${t("degraded","Mode dégradé")}</div>`:""}
+  `,a.appendChild(i),a.scrollTop=a.scrollHeight,n&&cn(e.text)}const un=Object.freeze(Object.defineProperty({__proto__:null,renderKhutbah:on},Symbol.toStringTag,{value:"Module"}));async function mn(e){var r;const n=e==null?void 0:e.mosqueId;h(`
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+        <h2 class="card-header" style="margin-bottom:0;">🕌 ${t("prayer_times","Horaires de prière")}</h2>
+        <button class="btn btn-sm btn-gold" id="btn-use-my-position">📍 ${t("use_my_position","Utiliser ma position exacte")}</button>
+      </div>
+      <div id="prayer-source-note" style="font-size:.82em; color:var(--muted); margin-bottom:10px;"></div>
+      <div id="prayer-mosque-wrap" class="form-group" style="display:none;">
+        <label>${t("mosque","Mosquée")}</label>
+        <select id="prayer-mosque"></select>
+      </div>
+      <div id="prayer-content" class="loading-center"><div class="spinner"></div></div>
+    </div>
+
+    <div id="mosque-location"></div>
+  `);const a=new Date().toISOString().split("T")[0];let i=[],o=n,s=null;try{if(i=await u("/api/mosques",{auth:!1}),o||(o=((r=i==null?void 0:i[0])==null?void 0:r.id)||null),s=(i==null?void 0:i.find(l=>l.id===o))||(i==null?void 0:i[0])||null,i&&i.length>1){const l=document.getElementById("prayer-mosque-wrap"),d=document.getElementById("prayer-mosque");l.style.display="block",i.forEach(c=>{const m=document.createElement("option");m.value=c.id,m.textContent=c.name,m.selected=c.id===o,d.appendChild(m)}),d.onchange=()=>{location.hash=`#/prayer/${d.value}`}}await pn(o,a),yn(s)}catch{ue(re())}document.getElementById("btn-use-my-position").onclick=()=>gn(o,a)}async function pn(e,n){let a;try{a=e?await u(`/api/prayer-times/${e}?date=${n}`,{auth:!1}):re()}catch{a=re()}ue(a),Je(null)}function Je(e){const n=document.getElementById("prayer-source-note");n&&(n.textContent=e||"")}function gn(e,n){const a=document.getElementById("btn-use-my-position");if(!navigator.geolocation){p(t("geolocation_unavailable","Géolocalisation non disponible"),"error");return}a.disabled=!0;const i=a.textContent;a.textContent="📡 "+t("locating","Localisation..."),navigator.geolocation.getCurrentPosition(async o=>{const{latitude:s,longitude:r}=o.coords;try{const l=await u(`/api/prayer-times/${e||"geo"}?date=${n}&lat=${s}&lng=${r}`,{auth:!1});ue(l),Je("📍 "+t("times_for_your_position","Horaires calculés pour votre position exacte")+` (${s.toFixed(3)}, ${r.toFixed(3)})`),p(t("position_used","Position exacte utilisée"),"success")}catch{p(t("geolocation_unavailable","Géolocalisation non disponible"),"error")}finally{a.disabled=!1,a.textContent=i}},()=>{p(t("geolocation_unavailable","Géolocalisation non disponible"),"error"),a.disabled=!1,a.textContent=i},{timeout:1e4,enableHighAccuracy:!0})}function hn(e,n,a,i){const s=(a-e)*Math.PI/180,r=(i-n)*Math.PI/180,l=Math.sin(s/2)**2+Math.cos(e*Math.PI/180)*Math.cos(a*Math.PI/180)*Math.sin(r/2)**2;return 6371*2*Math.atan2(Math.sqrt(l),Math.sqrt(1-l))}function yn(e){const n=document.getElementById("mosque-location");if(!n||!e||e.lat==null&&!e.address){n&&(n.innerHTML="");return}const a=e.lat!=null&&e.lng!=null?`https://www.google.com/maps/search/?api=1&query=${e.lat},${e.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.address||e.name||"")}`;n.innerHTML=`
+    <div class="card" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+      <span class="icon-badge">📍</span>
+      <div style="flex:1; min-width:180px;">
+        <div style="font-weight:600;">${e.name||t("mosque_location","Localisation de la mosquée")}</div>
+        ${e.address?`<div style="font-size:.85em; color:var(--muted);">${e.address}</div>`:""}
+        <div id="mosque-distance" style="font-size:.85em; color:var(--accent); margin-top:2px;"></div>
+      </div>
+      <a class="btn btn-sm btn-secondary" href="${a}" target="_blank" rel="noopener">🗺️ ${t("get_directions","Itinéraire")}</a>
+      ${e.lat!=null?`<button class="btn btn-sm btn-secondary" id="btn-locate-me">📡 ${t("locate_me","Me localiser")}</button>`:""}
+    </div>
+  `;const i=document.getElementById("btn-locate-me");i&&(i.onclick=()=>{if(!navigator.geolocation){p(t("geolocation_unavailable","Géolocalisation non disponible"),"error");return}i.disabled=!0,navigator.geolocation.getCurrentPosition(o=>{const s=hn(o.coords.latitude,o.coords.longitude,e.lat,e.lng),r=document.getElementById("mosque-distance");r&&(r.textContent="📏 "+t("distance_away","à {km} km de vous").replace("{km}",s<1?s.toFixed(2):s.toFixed(1))),i.disabled=!1},()=>{p(t("geolocation_unavailable","Géolocalisation non disponible"),"error"),i.disabled=!1},{timeout:1e4})})}function re(){return{date:new Date().toISOString().split("T")[0],fajr:{name:"Fajr",time:"05:30",type:"adhan"},sunrise:{name:"Sunrise",time:"07:15",type:"adhan"},dhuhr:{name:"Dhuhr",time:"13:00",type:"adhan"},asr:{name:"Asr",time:"16:30",type:"adhan"},maghrib:{name:"Maghrib",time:"19:45",type:"adhan"},isha:{name:"Isha",time:"21:15",type:"adhan"}}}function ue(e){var l;const n=document.getElementById("prayer-content");if(!n)return;n.className="";const a=new Date,i=a.getHours()*60+a.getMinutes(),s=[{key:"fajr",name:t("fajr","Fajr"),icon:"🌅"},{key:"sunrise",name:t("sunrise","Sunrise"),icon:"☀️"},{key:"dhuhr",name:t("dhuhr","Dhuhr"),icon:"🌤️"},{key:"asr",name:t("asr","Asr"),icon:"🌇"},{key:"maghrib",name:t("maghrib","Maghrib"),icon:"🌙"},{key:"isha",name:t("isha","Isha"),icon:"🌑"}].map(d=>{const c=e[d.key],m=(c==null?void 0:c.time)||c||"--:--",[y,$]=(typeof m=="string"?m:"--:--").split(":").map(Number);return{...d,time:m,min:Number.isFinite(y)&&Number.isFinite($)?y*60+$:null}});let r=null;for(const d of s)if(d.min!==null&&d.min>i){r=d.key;break}!r&&s.some(d=>d.min!==null)&&(r=s.find(d=>d.min!==null).key),n.innerHTML=`
+    <div style="text-align:center; margin-bottom:16px; color:var(--muted);">${e.date||new Date().toISOString().split("T")[0]}</div>
+    <div class="prayer-times-grid">
+      ${s.map(d=>{var y;const c=d.key===r,m=((y=e[`${d.key}Iqama`])==null?void 0:y.time)||e[`${d.key}_iqama`]||null;return`
+          <div class="prayer-card ${c?"active":""}">
+            ${c?`<div style="font-size:.68em; color:var(--accent2); font-weight:700; letter-spacing:.05em; margin-bottom:2px;">${t("next_prayer","Prochaine prière").toUpperCase()}</div>`:""}
+            <div class="name">${d.icon} ${d.name}</div>
+            <div class="time">${d.time}</div>
+            ${m?`<div class="type">${t("iqama","Iqama")}: ${m}</div>`:""}
+          </div>
+        `}).join("")}
+    </div>
+
+    ${e.jummahTime?`
+      ${B("۞")}
+      <div class="card card-accent" style="text-align:center;">
+        <div class="name" style="font-weight:600;">🕌 Jumu'ah</div>
+        <div class="time" style="font-size:1.4em; font-weight:700;">${((l=e.jummahTime)==null?void 0:l.time)||e.jummahTime}</div>
+      </div>
+    `:""}
+  `}const vn=Object.freeze(Object.defineProperty({__proto__:null,renderPrayer:mn},Symbol.toStringTag,{value:"Module"}));let C=[];function Qe(){try{return JSON.parse(localStorage.getItem("quran-favorites")||"[]")}catch{return[]}}function fn(e){const n=Qe(),a=n.indexOf(e);return a>=0?n.splice(a,1):n.push(e),localStorage.setItem("quran-favorites",JSON.stringify(n)),n.includes(e)}function bn(){try{return JSON.parse(localStorage.getItem("quran-last-read")||"null")}catch{return null}}function xn(e,n){localStorage.setItem("quran-last-read",JSON.stringify({number:e,name:n,at:Date.now()}))}async function $n(e){const n=e==null?void 0:e.number,a=e==null?void 0:e.ref;if(a){await In(a);return}if(n){await wn(parseInt(n));return}await _n()}async function _n(){const e=bn();h(`
+    <div class="card">
+      <h2 class="card-header">📖 ${t("quran","Coran")}</h2>
+
+      ${e?`
+        <a href="#/quran/surah/${e.number}" class="card card-link card-accent" style="display:flex; align-items:center; gap:12px; margin:0 0 16px; text-decoration:none; color:var(--fg);">
+          <span class="icon-badge">📖</span>
+          <div>
+            <div style="font-size:.78em; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">${t("resume_reading","Reprendre la lecture")}</div>
+            <div style="font-weight:600;">${e.name}</div>
+          </div>
+        </a>
+      `:""}
+
+      <div class="form-group">
+        <input type="search" id="quran-search" placeholder="${t("search_surah","Rechercher une sourate...")}" />
+      </div>
+      <div id="surah-list" class="loading-center"><div class="spinner"></div></div>
+    </div>
+  `);try{C=await u("/api/quran/surahs",{auth:!1}),G(C)}catch(n){const a=document.getElementById("surah-list");a.className="",a.innerHTML=`<p style="color:var(--danger);">${n.message}</p>`}document.getElementById("quran-search").oninput=async n=>{const a=n.target.value.trim();if(a.length<2){G(C);return}const i=a.toLowerCase(),o=C.filter(r=>r.nameEnglish.toLowerCase().includes(i)||r.nameTransliteration.toLowerCase().includes(i)||r.nameArabic.includes(i)||String(r.number).includes(i));if(o.length){G(o);return}const s=document.getElementById("surah-list");s.innerHTML='<div class="loading-center"><div class="spinner"></div></div>';try{const r=await u(`/api/quran/search?q=${encodeURIComponent(a)}`,{auth:!1}),l=(r==null?void 0:r.results)||[];if(s.className="",!l.length){s.innerHTML=`<p style="color:var(--muted); text-align:center; padding:20px;">${t("no_results","Aucun résultat")}</p>`;return}s.innerHTML=l.map(d=>d.type==="verse"?`<a href="#/quran/verse/${d.ref}" class="card card-link" style="display:block; padding:12px; text-decoration:none; color:var(--fg); margin:0;">
+             <div style="direction:rtl; text-align:right; font-family:var(--font-arabic); font-size:1.1em;">${d.text}</div>
+             <div style="font-size:0.8em; color:var(--accent); margin-top:4px;">📖 ${d.ref}</div>
+           </a>`:`<a href="#/quran/surah/${d.ref}" class="card card-link" style="display:block; padding:12px; text-decoration:none; color:var(--fg); margin:0;">
+             <div style="font-weight:600;">📖 ${d.text}</div>
+           </a>`).join("")}catch{G(C)}}}function G(e){const n=document.getElementById("surah-list");if(!n)return;n.className="";const a=Qe(),i=a.length?[...e].sort((o,s)=>(a.includes(s.number)?1:0)-(a.includes(o.number)?1:0)):e;n.innerHTML=`
+    <div class="card-grid" style="gap:8px;">
+      ${i.map(o=>`
+        <div class="card card-link" style="display:flex; align-items:center; gap:8px; padding:12px; margin:0;">
+          <a href="#/quran/surah/${o.number}" style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; text-decoration:none; color:var(--fg);">
+            <div style="width:36px; height:36px; border-radius:50%; background:var(--accent-grad); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.85em; font-weight:700; flex-shrink:0;">${o.number}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${o.nameTransliteration}</div>
+              <div style="font-size:0.8em; color:var(--muted);">${o.nameEnglish} · ${o.totalAyahs} ayahs</div>
+            </div>
+            <div style="font-size:1.3em; color:var(--accent2); direction:rtl;">${o.nameArabic}</div>
+          </a>
+          <button class="icon-btn btn-fav" data-number="${o.number}" title="${t("favorite","Favori")}" aria-label="${t("favorite","Favori")}" aria-pressed="${a.includes(o.number)}">${a.includes(o.number)?"⭐":"☆"}</button>
+        </div>
+      `).join("")}
+    </div>
+  `,n.querySelectorAll(".btn-fav").forEach(o=>{o.onclick=s=>{s.preventDefault();const r=Number(o.dataset.number),l=fn(r);o.textContent=l?"⭐":"☆",o.setAttribute("aria-pressed",String(l))}})}async function wn(e){h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/quran" class="btn btn-sm btn-secondary">←</a>
+      <h2 style="flex:1;" id="surah-title"><div class="spinner"></div></h2>
+      <button class="btn btn-sm btn-secondary" id="btn-play-all">▶ ${t("play_all","Tout écouter")}</button>
+    </div>
+    <div id="surah-content" class="loading-center"><div class="spinner"></div></div>
+    <audio id="ayah-audio" style="width:100%; margin-top:12px; display:none;" controls></audio>
+  `);try{const n=await u(`/api/quran/surahs/${e}`,{auth:!1});document.getElementById("surah-title").textContent=`${n.nameTransliteration} — ${n.nameEnglish}`,xn(e,`${n.nameTransliteration} — ${n.nameEnglish}`);const a=document.getElementById("surah-content");a.className="",a.innerHTML=`
+      <div style="text-align:center; font-size:1.8em; color:var(--accent2); direction:rtl; font-family:var(--font-arabic); margin-bottom:24px; line-height:1.8;">
+        بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ
+      </div>
+      ${(n.ayahs||[]).map(o=>`
+        <div class="ayah" id="ayah-${o.ayahNumber}">
+          <div class="arabic">${o.textArabic} <span class="ref">(${o.ayahNumber})</span></div>
+          ${o.translation?`<div class="translation">${o.translation}</div>`:""}
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="btn btn-sm btn-secondary btn-play-ayah" data-ayah="${o.ayahNumber}">▶ ${t("listen","Écouter")}</button>
+            <button class="btn btn-sm btn-secondary btn-tts-ayah" data-ayah="${o.ayahNumber}" data-ref="${e}:${o.ayahNumber}">🔊 ${t("read_aloud","Lire")}</button>
+          </div>
+        </div>
+      `).join("")}
+    `;const i=document.getElementById("ayah-audio");a.querySelectorAll(".btn-play-ayah").forEach(o=>{o.onclick=()=>{const s=r=>String(r).padStart(3,"0");i.src=`https://everyayah.com/data/Alafasy_128kbps/${s(e)}${s(Number(o.dataset.ayah))}.mp3`,i.style.display="block",i.play()}}),a.querySelectorAll(".btn-tts-ayah").forEach(o=>{o.onclick=()=>We(o.dataset.ref)}),document.getElementById("btn-play-all").onclick=()=>{const o=s=>String(s).padStart(3,"0");i.src=`https://everyayah.com/data/Alafasy_128kbps/${o(e)}001.mp3`,i.style.display="block",i.play()}}catch(n){const a=document.getElementById("surah-content");a.className="",a.innerHTML=`<p style="color:var(--danger);">${n.message}</p>`}}async function In(e){var n,a,i,o;h(`
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <a href="#/quran" class="btn btn-sm btn-secondary">←</a>
+      <h2 style="flex:1;">📖 Sourate ${e}</h2>
+    </div>
+    <div id="verse-content" class="loading-center"><div class="spinner"></div></div>
+    <audio id="verse-audio" style="width:100%; margin-top:12px; display:none;" controls></audio>
+  `);try{const s=await u(`/api/quran/verse/${e}`,{auth:!1}),r=document.getElementById("verse-content");r.className="";const l=e.split(/[:.]/)[0],d=e.split(/[:.]/)[1];r.innerHTML=`
+      <div class="card">
+        <div style="text-align:center; margin-bottom:8px; color:var(--muted);">${((n=s.surah)==null?void 0:n.nameTransliteration)||""} — Ayah ${((a=s.ayah)==null?void 0:a.ayahNumber)||""}</div>
+        <div class="ayah">
+          <div class="arabic" style="font-size:1.6em; line-height:2;">${((i=s.ayah)==null?void 0:i.textArabic)||""}</div>
+          ${(o=s.ayah)!=null&&o.translation?`<div class="translation" style="font-size:1.1em;">${s.ayah.translation}</div>`:""}
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btn-play">▶ ${t("listen","Écouter")}</button>
+          <button class="btn btn-secondary" id="btn-tts">🔊 ${t("read_aloud","Lire")}</button>
+        </div>
+      </div>
+    `;const c=document.getElementById("verse-audio");document.getElementById("btn-play").onclick=()=>{const m=y=>String(y).padStart(3,"0");c.src=`https://everyayah.com/data/Alafasy_128kbps/${m(Number(l))}${m(Number(d))}.mp3`,c.style.display="block",c.play()},document.getElementById("btn-tts").onclick=()=>We(e)}catch(s){const r=document.getElementById("verse-content");r.className="",r.innerHTML=`<p style="color:var(--danger);">${s.message}</p>`}}function We(e){if(!("speechSynthesis"in window)){p(t("tts_unsupported","Lecture vocale non supportée"),"error");return}u(`/api/quran/verse/${e}`,{auth:!1}).then(n=>{var o,s,r;const a=((o=n==null?void 0:n.ayah)==null?void 0:o.translation)||((s=n==null?void 0:n.ayah)==null?void 0:s.textArabic)||"";if(!a)return;window.speechSynthesis.cancel();const i=new SpeechSynthesisUtterance(a);i.lang=(r=n==null?void 0:n.ayah)!=null&&r.translation?S():"ar-SA",i.rate=.95,window.speechSynthesis.speak(i)}).catch(()=>p(t("tts_failed","Impossible de lire ce verset"),"error"))}const En=Object.freeze(Object.defineProperty({__proto__:null,renderQuran:$n},Symbol.toStringTag,{value:"Module"}));async function kn(e){var c,m,y;const n=new Date,a=new Intl.DateTimeFormat(S(),{day:"numeric",month:"long",year:"numeric"}).format(n);let i="",o=null;const s=await u("/api/hijri",{auth:!1}).catch(()=>null);if(s!=null&&s.hijri){const $=R()==="ar",b=$?s.hijri.monthNameAr:s.hijri.monthNameFr;i=$?`${s.hijri.day} ${b} ${s.hijri.year} هـ`:`${s.hijri.day} ${b} ${s.hijri.year} AH`,s.hijri.month===9&&(i+=` · ${t("ramadan","Ramadan")}`,o=s.hijri.day)}let r=null;try{const $=await u("/api/mosques",{auth:!1}),b=(c=$==null?void 0:$[0])==null?void 0:c.id;if(b){const g=new Date().toISOString().split("T")[0];r=await u(`/api/prayer-times/${b}?date=${g}`,{auth:!1})}}catch{r=null}const l=((m=r==null?void 0:r.fajr)==null?void 0:m.time)||"--:--",d=((y=r==null?void 0:r.maghrib)==null?void 0:y.time)||"--:--";h(`
+    <div class="hero-mosque" style="padding-top:24px;">
+      <div style="font-size:3em;">🌙</div>
+      ${o?`<div class="badge-live live" style="display:inline-block; margin:8px 0 2px;">${t("ramadan_day","Jour")} ${o}</div>`:""}
+      <h2 style="margin:8px 0 4px;">${t("ramadan","Ramadan")}</h2>
+      <p style="color:var(--muted);">${a}</p>
+      ${i?`<p style="color:var(--accent2); font-weight:600;">${i}</p>`:""}
+    </div>
+
+    ${B("✦ ✦ ✦")}
+
+    <div class="card-grid">
+      <div class="card card-accent">
+        <h3 class="card-header">🌅 ${t("fajr","Fajr")}</h3>
+        <div style="font-size:2em; font-weight:700; text-align:center;">${l}</div>
+        <div style="text-align:center; color:var(--muted); font-size:0.9em;">${t("dawn_prayer","Prière de l'aube")}</div>
+      </div>
+
+      <div class="card card-accent">
+        <h3 class="card-header">🌇 ${t("maghrib","Maghrib")}</h3>
+        <div style="font-size:2em; font-weight:700; text-align:center;">${d}</div>
+        <div style="text-align:center; color:var(--muted); font-size:0.9em;">${t("iftar","Iftar")}</div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-header">🌙 ${t("tarawih","Tarawih")}</h3>
+        <div style="font-size:2em; font-weight:700; text-align:center;">21:30</div>
+        <div style="text-align:center; color:var(--muted); font-size:0.9em;">${t("night_prayer","Prière de la nuit")} · <em>${t("indicative","indicatif")}</em></div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-header">📖 ${t("juz_of_day","Juz du jour")}</h3>
+        <div style="font-size:1.1em; text-align:center; color:var(--accent);">${t("juz_info","Consultez le programme de la mosquée")}</div>
+      </div>
+    </div>
+  `)}const Sn=Object.freeze(Object.defineProperty({__proto__:null,renderRamadan:kn},Symbol.toStringTag,{value:"Module"}));async function Tn(){h(`
+    <div class="card" style="text-align:center; padding:30px;">
+      <div style="font-size:3em;">🤲</div>
+      <h2 style="margin:12px 0;">${t("donate","Faire un don")}</h2>
+      <p style="color:var(--muted); margin-bottom:20px;">${t("donate_subtitle","Votre soutien est essentiel pour la vie de la mosquée. Qu'Allah vous récompense.")}</p>
+      <div id="donation-content" class="loading-center"><div class="spinner"></div></div>
+    </div>
+  `);let e="";try{const n=await u("/api/settings/public",{auth:!1});e=(n==null?void 0:n.name)||"";const a=(n==null?void 0:n.donation)||{},i=a.paypal||a.iban||a.text,o=document.getElementById("donation-content");o.className="",o.innerHTML=`
+      ${a.title?`<h3 style="color:var(--accent); margin-bottom:12px;">${a.title}</h3>`:""}
+
+      ${a.iban?`
+        <div class="card" style="background:var(--bg2); text-align:left;">
+          <div style="font-weight:600; margin-bottom:6px;">🏦 ${t("bank_transfer","Virement bancaire")}</div>
+          <div style="font-family:monospace; font-size:1.05em; word-break:break-all;">${a.iban}</div>
+          ${a.bankName?`<div style="color:var(--muted); font-size:0.85em; margin-top:4px;">${a.bankName}</div>`:""}
+          <button class="btn btn-sm btn-secondary" id="copy-iban" style="margin-top:12px;">📋 ${t("copy","Copier")}</button>
+        </div>
+      `:""}
+
+      ${a.paypal?`
+        <a class="btn btn-primary btn-block" style="margin:8px 0;" href="${a.paypal}" target="_blank" rel="noopener">
+          💳 PayPal ${t("donate","— Faire un don")}
+        </a>
+      `:""}
+
+      ${a.text?`
+        <div class="card" style="text-align:center;">
+          <div style="font-size:0.9em; color:var(--muted); margin-bottom:8px;">${a.text}</div>
+          <button class="btn btn-sm btn-secondary" id="copy-text" style="cursor:pointer;">📋 ${t("copy","Copier")}</button>
+        </div>
+      `:""}
+
+      ${i?`
+        <div style="margin-top:16px;">
+          ${a.paypal||a.iban?`
+            <img src="${W}/api/qr.png?text=${encodeURIComponent(a.paypal||a.iban)}&size=9"
+                 style="width:180px; background:#fff; padding:8px; border-radius:12px;"
+                 alt="QR don" />
+            <div style="color:var(--muted); font-size:0.85em; margin-top:6px;">${t("donate_qr_hint","Scannez avec l'appareil photo de votre téléphone")}</div>
+          `:""}
+        </div>
+      `:`
+        <p style="color:var(--muted); font-size:0.9em; margin-top:8px;">
+          ${t("donate_contact","Contactez la mosquée pour connaître les moyens de soutien.")}
+        </p>
+      `}
+    `;const s=document.getElementById("copy-iban");s&&(s.onclick=()=>{var l;(l=navigator.clipboard)==null||l.writeText(a.iban).then(()=>p(t("copied","Copié"),"success"))});const r=document.getElementById("copy-text");r&&(r.onclick=()=>{var l;(l=navigator.clipboard)==null||l.writeText(a.text||"").then(()=>p(t("copied","Copié"),"success"))})}catch{const n=document.getElementById("donation-content");n.className="",n.innerHTML=`<p style="color:var(--muted);">${t("donate_contact","Contactez la mosquée pour connaître les moyens de soutien.")}</p>`}if(e){const n=document.querySelector("#main h2");n&&(n.textContent+=` — ${e}`)}}const qn=Object.freeze(Object.defineProperty({__proto__:null,renderSupport:Tn},Symbol.toStringTag,{value:"Module"}));
+</script>
+<script>if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('./sw.js', { scope: './' })})}</script></head>
+<body>
+<div id="app">
+  <header id="header">
+    <div class="logo"><span class="mark">🕌</span> <span data-i18n="app_name">Mosqué Digital</span></div>
+    <div class="header-right">
+      <nav class="nav" id="main-nav"></nav>
+      <div id="header-clock" class="header-clock" role="status" aria-live="off">
+        <span class="hc-time"><span class="hc-h">--</span><span class="hc-colon">:</span><span class="hc-m">--</span><span class="hc-sec"><span class="hc-colon">:</span><span class="hc-s">--</span></span></span>
+        <span class="hc-date"></span>
+      </div>
+      <div id="header-tools">
+        <select class="lang-quick" id="lang-quick" aria-label="Langue"></select>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Changer de thème">🌙</button>
+      </div>
+    </div>
+  </header>
+  <main id="main"><div class="loading-center"><div class="spinner"></div><span data-i18n="loading">Chargement...</span></div></main>
+  <nav id="mobile-nav"></nav>
+</div>
+<div id="toast-container"></div>
+
+</body>
+</html>

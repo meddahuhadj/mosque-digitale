@@ -14,15 +14,19 @@ export default defineConfig({
     rollupOptions: {
       input: resolve(__dirname, 'mosque/index.html'),
       output: {
+        // NB: no `dir` here — an explicit relative `dir` is resolved by Rollup
+        // against process.cwd(), not against Vite's `root`, which silently sent
+        // the build to <repo>/dist instead of <repo>/frontend/dist (the path
+        // backend/main.py actually serves). `build.outDir` above already
+        // resolves correctly relative to `root` — let it drive the output dir.
         inlineDynamicImports: true,
-        dir: '../dist',
       },
     },
   },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mosque-bg.jpg'],
+      includeAssets: ['icon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'mosque-bg.jpg'],
       manifest: {
         name: 'Mosqué Digital',
         short_name: 'Mosqué',

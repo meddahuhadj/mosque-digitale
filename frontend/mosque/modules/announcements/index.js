@@ -1,8 +1,8 @@
 // ── Announcements Module ───────────────────────────────────────────────
 
 import { api } from "../../core/api.js";
-import { t } from "../../core/i18n.js";
-import { renderMain, toast } from "../../core/components.js";
+import { t, getLocaleTag } from "../../core/i18n.js";
+import { renderMain, toast, ornamentHtml } from "../../core/components.js";
 
 export async function renderAnnouncements(params) {
   const mosqueId = params?.mosqueId;
@@ -10,6 +10,7 @@ export async function renderAnnouncements(params) {
   renderMain(`
     <div class="card">
       <h2 class="card-header">📢 ${t("announcements", "Annonces")}</h2>
+      ${ornamentHtml("۞")}
       <div id="announcements-list" class="loading-center"><div class="spinner"></div></div>
     </div>
   `);
@@ -27,11 +28,14 @@ export async function renderAnnouncements(params) {
       const items = await api(`/api/announcements/${actualMosqueId}`, { auth: false });
       renderAnnouncementList(items);
     } catch (err) {
-      document.getElementById("announcements-list").innerHTML =
-        `<p style="color:var(--muted); text-align:center; padding:20px;">${t("no_announcements", "Aucune annonce pour le moment")}</p>`;
+      const el = document.getElementById("announcements-list");
+      el.className = "";
+      el.innerHTML = `<p style="color:var(--muted); text-align:center; padding:20px;">${t("no_announcements", "Aucune annonce pour le moment")}</p>`;
     }
   } else {
-    document.getElementById("announcements-list").innerHTML = `
+    const el = document.getElementById("announcements-list");
+    el.className = "";
+    el.innerHTML = `
       <p style="color:var(--muted); text-align:center; padding:20px;">
         ${t("select_mosque", "Sélectionnez une mosquée pour voir les annonces")}
       </p>
@@ -42,20 +46,29 @@ export async function renderAnnouncements(params) {
 function renderAnnouncementList(items) {
   const el = document.getElementById("announcements-list");
   if (!el) return;
+  el.className = ""; // retire "loading-center" (flex centré, hérité du spinner initial)
 
   if (!items?.length) {
     el.innerHTML = `<p style="color:var(--muted); text-align:center;">${t("no_announcements", "Aucune annonce")}</p>`;
     return;
   }
 
-  el.innerHTML = items.map(a => `
+  // Épinglées et urgentes en tête, puis plus récentes d'abord.
+  const rank = (a) => (a.priority === "urgent" ? 2 : 0) + (a.pinned ? 1 : 0);
+  const sorted = [...items].sort((a, b) => {
+    const r = rank(b) - rank(a);
+    if (r !== 0) return r;
+    return new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0);
+  });
+
+  el.innerHTML = sorted.map(a => `
     <div class="announcement-item ${a.priority === "urgent" ? "urgent" : ""}">
       <div class="title">
         ${a.priority === "urgent" ? "🔴 " : a.pinned ? "📌 " : ""}${a.title}
       </div>
       <div class="body">${a.body}</div>
       <div class="meta">
-        ${a.publishedAt ? new Date(a.publishedAt).toLocaleDateString() : ""}
+        ${a.publishedAt ? new Date(a.publishedAt).toLocaleDateString(getLocaleTag()) : ""}
         ${a.category ? ` · ${a.category}` : ""}
       </div>
     </div>

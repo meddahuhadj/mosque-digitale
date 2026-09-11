@@ -29,7 +29,10 @@ export async function renderAuth(params) {
 
         <div class="form-group">
           <label>${t("password", "Mot de passe")}</label>
-          <input type="password" name="password" required minlength="8" placeholder="••••••••" />
+          <div style="position:relative;">
+            <input type="password" name="password" id="auth-password" required minlength="8" placeholder="••••••••" style="padding-right:44px;" />
+            <button type="button" id="toggle-password" class="icon-btn" style="position:absolute; right:2px; top:50%; transform:translateY(-50%); width:34px; height:34px;" title="${t("show_password", "Afficher le mot de passe")}" aria-label="${t("show_password", "Afficher le mot de passe")}">👁</button>
+          </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" id="auth-submit">
@@ -44,6 +47,14 @@ export async function renderAuth(params) {
       </div>
     </div>
   `);
+
+  document.getElementById("toggle-password").onclick = () => {
+    const input = document.getElementById("auth-password");
+    const btn = document.getElementById("toggle-password");
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    btn.textContent = show ? "🙈" : "👁";
+  };
 
   document.getElementById("auth-form").onsubmit = async (e) => {
     e.preventDefault();

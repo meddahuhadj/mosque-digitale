@@ -67,4 +67,22 @@ export function renderMain(content) {
   const main = document.getElementById("main");
   if (typeof content === "string") main.innerHTML = content;
   else if (content instanceof HTMLElement) { main.innerHTML = ""; main.appendChild(content); }
+  // Retrigger the page-enter transition on every navigation/render.
+  main.classList.remove("page-enter");
+  void main.offsetWidth;
+  main.classList.add("page-enter");
+}
+
+// ── Ornamental divider (۞ separator used throughout the app) ────────────
+
+export function ornament(symbol = "۞") {
+  const div = document.createElement("div");
+  div.className = "ornament";
+  div.setAttribute("aria-hidden", "true");
+  div.textContent = symbol;
+  return div;
+}
+
+export function ornamentHtml(symbol = "۞") {
+  return `<div class="ornament" aria-hidden="true">${symbol}</div>`;
 }

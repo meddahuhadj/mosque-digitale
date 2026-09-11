@@ -1,9 +1,37 @@
 // ── Imam Module ────────────────────────────────────────────────────────
 
 import { api, isAuthenticated, API_BASE } from "../../core/api.js";
-import { getSocket } from "../../core/socket.js";
+import { getSocket, getBroadcasterToken, setBroadcasterToken } from "../../core/socket.js";
 import { t } from "../../core/i18n.js";
-import { renderMain, toast } from "../../core/components.js";
+import { renderMain, toast, ornamentHtml } from "../../core/components.js";
+
+// ── Bibliothèque de phrases de khutbah (formules récurrentes, envoi en un tap) ──
+
+const DEFAULT_PHRASES = [
+  "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+  "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
+  "اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ",
+  "يَا أَيُّهَا الَّذِينَ آمَنُوا",
+  "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ",
+  "قَالَ اللَّهُ تَعَالَى",
+  "قَالَ رَسُولُ اللَّهِ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ",
+  "أَقُولُ قَوْلِي هَذَا وَأَسْتَغْفِرُ اللَّهَ لِي وَلَكُمْ",
+  "اللَّهُمَّ اغْفِرْ لِلْمُؤْمِنِينَ وَالْمُؤْمِنَاتِ",
+  "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",
+  "أَقِيمُوا الصَّلَاةَ",
+  "وَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ",
+];
+
+function getPhrases() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("khutbah-phrases") || "null");
+    return Array.isArray(stored) && stored.length ? stored : DEFAULT_PHRASES;
+  } catch { return DEFAULT_PHRASES; }
+}
+
+function savePhrases(list) {
+  localStorage.setItem("khutbah-phrases", JSON.stringify(list));
+}
 
 export async function renderImam(params) {
   if (!isAuthenticated()) {
@@ -60,6 +88,7 @@ async function renderImamDashboard() {
         method: "POST",
         body: { mosque_name: topic, target_langs: ["fr", "en"] },
       });
+      if (data.broadcaster_token) setBroadcasterToken(data.code, data.broadcaster_token);
       toast(`${t("session_created", "Session créée")}: ${data.code}`, "success");
       location.hash = `#/imam/${data.code}`;
     } catch (err) {
@@ -97,14 +126,15 @@ async function renderImamControl(code) {
   renderMain(`
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
       <a href="#/imam" class="btn btn-sm btn-secondary">←</a>
-      <span style="font-weight:600;">👳 ${t("imam_control", "Contrôle Imam")}</span>
-      <span style="margin-left:auto; font-size:0.85em; color:var(--muted);" id="imam-status">⏳</span>
+      <span style="font-weight:600; font-family:var(--font-heading);">👳 ${t("imam_control", "Contrôle Imam")}</span>
+      <span id="imam-status" class="badge-live" style="margin-left:auto;">⏳</span>
     </div>
 
     <div class="card" style="text-align:center;">
       <h3 class="card-header" style="justify-content:center;">📱 ${t("qr_session", "QR Code de la session")}</h3>
       <img src="${API_BASE}/api/session/${code}/qr.png" style="width:200px; margin:16px auto; border-radius:12px; background:#fff; padding:8px;" id="imam-qr-img" />
       <div style="font-size:0.85em; color:var(--muted); word-break:break-all;" id="join-url"></div>
+      <button class="btn btn-sm btn-secondary" id="copy-join-url" style="margin-top:10px;">📋 ${t("copy_link", "Copier le lien")}</button>
     </div>
 
     <div class="card">
@@ -115,8 +145,18 @@ async function renderImamControl(code) {
       </div>
 
       <div class="form-group">
+        <label>📚 ${t("phrase_library", "Bibliothèque de phrases")}</label>
+        <div id="phrase-chips" dir="rtl" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="new-phrase" dir="rtl" placeholder="${t("add_phrase", "Ajouter une phrase...")}" style="flex:1; direction:rtl; text-align:right; font-family:var(--font-arabic);" />
+          <button class="btn btn-sm btn-secondary" id="add-phrase" title="${t("add", "Ajouter")}">+</button>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="reset-phrases" style="margin-top:6px; font-size:.78em;">${t("reset_defaults", "Rétablir la liste par défaut")}</button>
+      </div>
+
+      <div class="form-group">
         <label>${t("type_arabic", "Saisir du texte arabe")}</label>
-        <textarea id="manual-text" rows="3" placeholder="${t("arabic_placeholder", "Texte arabe...")}" style="direction:rtl; text-align:right; font-family:'Noto Naskh Arabic',serif; font-size:1.2em;"></textarea>
+        <textarea id="manual-text" rows="3" placeholder="${t("arabic_placeholder", "Texte arabe...")}" style="direction:rtl; text-align:right; font-family:var(--font-arabic); font-size:1.2em;"></textarea>
       </div>
       <button class="btn btn-primary btn-block" id="send-text">${t("send", "Envoyer")}</button>
     </div>
@@ -127,6 +167,8 @@ async function renderImamControl(code) {
       <div id="imam-quran" style="margin-top:8px;"></div>
     </div>
 
+    ${ornamentHtml("۞")}
+
     <div class="card">
       <h4 class="card-header">📝 ${t("segments", "Segments")}</h4>
       <div id="imam-segments" style="max-height:40vh; overflow-y:auto;"></div>
@@ -134,49 +176,119 @@ async function renderImamControl(code) {
   `);
 
   const socket = getSocket("/khutbah");
+  const token = getBroadcasterToken(code);
+  let joinUrl = `${window.location.origin}/#/khutbah/${code}`;
 
   try {
     const session = await api(`/api/session/${code}`);
+    joinUrl = session.join_url || joinUrl;
     const joinUrlEl = document.getElementById("join-url");
-    if (joinUrlEl) joinUrlEl.textContent = session.join_url || `${window.location.origin}/#/khutbah/${code}`;
+    if (joinUrlEl) joinUrlEl.textContent = joinUrl;
   } catch {
     const joinUrlEl = document.getElementById("join-url");
-    if (joinUrlEl) joinUrlEl.textContent = `${window.location.origin}/#/khutbah/${code}`;
+    if (joinUrlEl) joinUrlEl.textContent = joinUrl;
   }
 
-  socket.on("connect", () => {
-    document.getElementById("imam-status").textContent = "🟢 " + t("connected", "Connecté");
-    socket.emit("join-broadcast", { code });
-  });
+  document.getElementById("copy-join-url").onclick = () => {
+    navigator.clipboard?.writeText(joinUrl).then(() => toast(t("copied", "Copié"), "success"));
+  };
+
+  function setStatus(isLive, label) {
+    const el = document.getElementById("imam-status");
+    if (!el) return;
+    el.textContent = label;
+    el.classList.toggle("live", !!isLive);
+  }
+
+  socket.on("connect", () => setStatus(false, "🟢 " + t("connected", "Connecté")));
 
   socket.on("hello", (data) => {
-    document.getElementById("imam-status").textContent = data.status === "live" ? "🔴 LIVE" : `⏸ ${data.status}`;
-    document.getElementById("listener-count").textContent = data.listeners;
+    setStatus(data.status === "live", data.status === "live" ? `🔴 ${t("live", "LIVE")}` : `⏸ ${data.status}`);
+    document.getElementById("listener-count").textContent = data.listeners ?? 0;
+  });
+
+  socket.on("stats", (data) => {
+    if (data.listeners !== undefined) document.getElementById("listener-count").textContent = data.listeners;
+  });
+
+  socket.on("session", (data) => {
+    setStatus(data.status === "live", data.status === "live" ? `🔴 ${t("live", "LIVE")}` : `⏸ ${data.status}`);
   });
 
   socket.on("monitor", (data) => {
-    document.getElementById("listener-count").textContent = data.listeners;
+    document.getElementById("listener-count").textContent = data.listeners ?? document.getElementById("listener-count").textContent;
     if (data.is_quran && data.quran_ref) {
       document.getElementById("imam-quran").innerHTML = `<div class="card" style="padding:12px; border-left:3px solid var(--accent);">📖 ${data.quran_ref}</div>`;
     }
     addImamSegment(data);
   });
 
-  socket.on("status", (data) => {
-    document.getElementById("imam-status").textContent = data.status === "live" ? "🔴 LIVE" : `⏸ ${data.status}`;
-  });
+  socket.on("disconnect", () => setStatus(false, `⚠️ ${t("disconnected", "Déconnecté")}`));
 
-  document.getElementById("btn-pause").onclick = () => socket.emit("control", { code, action: "pause" });
-  document.getElementById("btn-resume").onclick = () => socket.emit("control", { code, action: "resume" });
-  document.getElementById("btn-stop").onclick = () => socket.emit("control", { code, action: "stop" });
+  document.getElementById("btn-pause").onclick = () => socket.emit("control", { action: "pause" });
+  document.getElementById("btn-resume").onclick = () => socket.emit("control", { action: "resume" });
+  document.getElementById("btn-stop").onclick = () => socket.emit("control", { action: "stop" });
+
+  function sendManual(text) {
+    if (!text) return;
+    socket.emit("transcript", { text, is_final: true, manual: true });
+  }
 
   document.getElementById("send-text").onclick = () => {
     const text = document.getElementById("manual-text").value.trim();
-    if (text) {
-      socket.emit("transcript", { code, text, is_final: true });
-      document.getElementById("manual-text").value = "";
-    }
+    sendManual(text);
+    document.getElementById("manual-text").value = "";
   };
+
+  // ── Bibliothèque de phrases : un tap = envoi immédiat ──
+  function renderPhraseChips() {
+    const wrap = document.getElementById("phrase-chips");
+    if (!wrap) return;
+    const phrases = getPhrases();
+    wrap.innerHTML = phrases.map((p, i) => `
+      <span class="btn btn-sm btn-secondary phrase-chip" data-i="${i}" style="cursor:pointer; font-family:var(--font-arabic); gap:6px;">
+        ${p}
+        <button class="phrase-del" data-i="${i}" title="${t("delete", "Supprimer")}" aria-label="${t("delete", "Supprimer")}" style="background:none; border:none; color:inherit; opacity:.6; padding:0; font:inherit; cursor:pointer;">✕</button>
+      </span>
+    `).join("");
+    wrap.querySelectorAll(".phrase-chip").forEach(chip => {
+      chip.onclick = (e) => {
+        if (e.target.classList.contains("phrase-del")) return;
+        sendManual(phrases[Number(chip.dataset.i)]);
+      };
+    });
+    wrap.querySelectorAll(".phrase-del").forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const list = getPhrases();
+        list.splice(Number(btn.dataset.i), 1);
+        savePhrases(list);
+        renderPhraseChips();
+      };
+    });
+  }
+  renderPhraseChips();
+
+  document.getElementById("add-phrase").onclick = () => {
+    const input = document.getElementById("new-phrase");
+    const val = input.value.trim();
+    if (!val) return;
+    const list = getPhrases();
+    list.push(val);
+    savePhrases(list);
+    input.value = "";
+    renderPhraseChips();
+  };
+  document.getElementById("new-phrase").onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("add-phrase").click(); }
+  };
+  document.getElementById("reset-phrases").onclick = () => {
+    localStorage.removeItem("khutbah-phrases");
+    renderPhraseChips();
+    toast(t("defaults_restored", "Liste par défaut rétablie"), "success");
+  };
+
+  socket.emit("join-broadcast", { code, token });
 }
 
 function addImamSegment(data) {

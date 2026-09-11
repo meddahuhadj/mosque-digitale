@@ -1,1 +1,77 @@
-if(!self.define){let e,n={};const i=(i,o)=>(i=new URL(i+".js",o).href,n[i]||new Promise(n=>{if("document"in self){const e=document.createElement("script");e.src=i,e.onload=n,document.head.appendChild(e)}else e=i,importScripts(i),n()}).then(()=>{let e=n[i];if(!e)throw new Error(`Module ${i} didn’t register its module`);return e}));self.define=(o,r)=>{const c=e||("document"in self?document.currentScript.src:"")||location.href;if(n[c])return;let s={};const a=e=>i(e,c),t={module:{uri:c},exports:s,require:a};n[c]=Promise.all(o.map(e=>t[e]||a(e))).then(e=>(r(...e),s))}}define(["./workbox-dcde9eb3"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"mosque-bg.jpg",revision:"fa1f346b998397bea07edcdbb0cc6a92"},{url:"icon-512.png",revision:"e2c46d343e616a0b81142d3107fde701"},{url:"icon-192.png",revision:"a588a82d9ff49cfa6235757763656a8e"},{url:"favicon-32.png",revision:"0b7e395e844f955a0c50733ea7083805"},{url:"apple-touch-icon.png",revision:"230ebf8fb72223977bc2098f23d9e575"},{url:"apple-touch-icon.png",revision:"230ebf8fb72223977bc2098f23d9e575"},{url:"mosque-bg.jpg",revision:"fa1f346b998397bea07edcdbb0cc6a92"},{url:"manifest.webmanifest",revision:"a520382fa1327bf7a381d2486fbb935d"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html"))),e.registerRoute(/^https:\/\/api\.alquran\.cloud\/.*/i,new e.CacheFirst({cacheName:"quran-api",plugins:[new e.ExpirationPlugin({maxEntries:500,maxAgeSeconds:2592e3})]}),"GET"),e.registerRoute(/^https:\/\/everyayah\.com\/.*/i,new e.CacheFirst({cacheName:"quran-audio",plugins:[new e.ExpirationPlugin({maxEntries:100,maxAgeSeconds:604800})]}),"GET")});
+// ── Service Worker — Mosqué Digital ──────────────────────────────────
+const CACHE_NAME = "mosque-os-v2";
+const API_CACHE = "mosque-api-v1";
+const SHELL = [
+  "./",
+  "./index.html",
+  "./core/app.js",
+  "./core/api.js",
+  "./core/router.js",
+  "./core/i18n.js",
+  "./core/theme.js",
+  "./core/socket.js",
+  "./core/components.js",
+  "./lang/fr.json",
+  "./lang/en.json",
+];
+
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(SHELL)));
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys().then((ks) =>
+      Promise.all(ks.filter((k) => k !== CACHE_NAME && k !== API_CACHE).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (e) => {
+  const url = new URL(e.request.url);
+
+  // Network-first with cache fallback for prayer-times and hijri APIs
+  if (url.pathname.startsWith("/api/prayer-times") || url.pathname.startsWith("/api/hijri")) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(API_CACHE).then((c) => c.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Never cache other API or WebSocket calls
+  if (url.pathname.startsWith("/api") || url.pathname.startsWith("/ws")) return;
+
+  // Cache-first for shell assets, network-first for navigation
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match("./index.html"))
+    );
+  } else {
+    e.respondWith(
+      caches.match(e.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(e.request).then((res) => {
+          if (res.ok && url.origin === self.location.origin) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(e.request, clone));
+          }
+          return res;
+        });
+      })
+    );
+  }
+});

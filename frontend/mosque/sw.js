@@ -1,5 +1,6 @@
 // ── Service Worker — Mosqué Digital ──────────────────────────────────
-const CACHE_NAME = "mosque-os-v1";
+const CACHE_NAME = "mosque-os-v2";
+const API_CACHE = "mosque-api-v1";
 const SHELL = [
   "./",
   "./index.html",
@@ -22,7 +23,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((ks) =>
-      Promise.all(ks.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(ks.filter((k) => k !== CACHE_NAME && k !== API_CACHE).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -31,8 +32,22 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
-  // Never cache API or Socket.IO calls
-  if (url.pathname.startsWith("/api") || url.pathname.startsWith("/socket.io")) return;
+  // Network-first with cache fallback for prayer-times and hijri APIs
+  if (url.pathname.startsWith("/api/prayer-times") || url.pathname.startsWith("/api/hijri")) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(API_CACHE).then((c) => c.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Never cache other API or WebSocket calls
+  if (url.pathname.startsWith("/api") || url.pathname.startsWith("/ws")) return;
 
   // Cache-first for shell assets, network-first for navigation
   if (e.request.mode === "navigate") {
