@@ -778,6 +778,13 @@ async def lifespan(app: FastAPI):
         await redis_pubsub.subscribe_room(code)
     
     task = asyncio.create_task(_janitor())
+
+    # Préchauffe le cache des hadiths (ar+fr, ~15 Mo) en tâche de fond, sans
+    # bloquer le démarrage — sinon le premier visiteur de /hadith attend le
+    # téléchargement complet depuis GitHub (~15-30s).
+    from content import hadith_warmup
+    asyncio.create_task(hadith_warmup())
+
     yield
     task.cancel()
     for room in list(ROOMS.values()):

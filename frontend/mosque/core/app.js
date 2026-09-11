@@ -38,6 +38,11 @@ async function quranPage(params) {
   await renderQuran(params);
 }
 
+async function hadithPage(params) {
+  const { renderHadith } = await loadModule("hadith/index");
+  await renderHadith(params);
+}
+
 async function khutbahPage(params) {
   const { renderKhutbah } = await loadModule("khutbah/index");
   await renderKhutbah(params);
@@ -138,6 +143,9 @@ addRoute("/prayer/:mosqueId", prayerPage);
 addRoute("/quran", quranPage);
 addRoute("/quran/surah/:number", quranPage);
 addRoute("/quran/verse/:ref", quranPage);
+addRoute("/hadith", hadithPage);
+addRoute("/hadith/book/:book", hadithPage);
+addRoute("/hadith/read/:number", hadithPage);
 addRoute("/khutbah", khutbahPage);
 addRoute("/khutbah/:code", khutbahPage);
 addRoute("/announcements", announcementsPage);

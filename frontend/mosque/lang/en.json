@@ -241,5 +241,12 @@
   "use_my_position": "Use my exact position",
   "locating": "Locating...",
   "times_for_your_position": "Prayer times computed for your exact position",
-  "position_used": "Exact position used"
+  "position_used": "Exact position used",
+
+  "hadith": "Hadith",
+  "sahih_bukhari": "Sahih al-Bukhari",
+  "search_hadith": "Search a hadith...",
+  "hadith_no": "Hadith #",
+  "hadiths_count": "hadiths",
+  "tts_failed_hadith": "Unable to read this hadith aloud"
 }

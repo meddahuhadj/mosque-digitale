@@ -241,5 +241,12 @@
   "use_my_position": "استخدام موقعي الدقيق",
   "locating": "جارٍ تحديد الموقع...",
   "times_for_your_position": "مواقيت محسوبة بناءً على موقعك الدقيق",
-  "position_used": "تم استخدام موقعك الدقيق"
+  "position_used": "تم استخدام موقعك الدقيق",
+
+  "hadith": "الحديث",
+  "sahih_bukhari": "صحيح البخاري",
+  "search_hadith": "ابحث عن حديث...",
+  "hadith_no": "الحديث رقم ",
+  "hadiths_count": "حديثًا",
+  "tts_failed_hadith": "تعذّرت قراءة هذا الحديث"
 }

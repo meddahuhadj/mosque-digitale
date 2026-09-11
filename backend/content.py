@@ -8,6 +8,7 @@ Mount in main.py:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -509,6 +510,176 @@ async def quran_search(q: str = Query(min_length=2)):
         except Exception:
             pass
     return {"results": results}
+
+
+# --------------------------------------------------------------------------- #
+# Hadith — Sahih al-Bukhari (fawazahmed0/hadith-api, texte intégral en cache mémoire)
+# --------------------------------------------------------------------------- #
+# Le contenu ne change jamais une fois publié : on télécharge chaque édition
+# une seule fois par processus (~5-9 Mo/langue) puis on sert depuis la RAM —
+# pas de TTL comme pour la Quran/les horaires de prière (données journalières).
+
+_hadith_cache: dict[str, dict] = {}
+_hadith_locks: dict[str, asyncio.Lock] = {}
+
+_HADITH_EDITIONS = {
+    "ar": "ara-bukhari",
+    "fr": "fra-bukhari",
+    "en": "eng-bukhari",
+}
+_HADITH_BASE_URL = "https://raw.githubusercontent.com/fawazahmed0/hadith-api/1/editions/{edition}.min.json"
+
+
+async def _hadith_load(lang: str) -> dict | None:
+    edition = _HADITH_EDITIONS.get(lang, _HADITH_EDITIONS["fr"])
+    if edition in _hadith_cache:
+        return _hadith_cache[edition]
+
+    # Un verrou par édition : évite que plusieurs requêtes concurrentes (ou le
+    # préchauffage au démarrage + une requête utilisateur) ne téléchargent le
+    # même fichier de 5-9 Mo en double avant que le cache ne soit rempli.
+    lock = _hadith_locks.setdefault(edition, asyncio.Lock())
+    async with lock:
+        if edition in _hadith_cache:  # un autre appel a fini pendant l'attente du verrou
+            return _hadith_cache[edition]
+
+        # raw.githubusercontent.com est parfois lent/instable sur un gros fichier
+        # — quelques tentatives valent mieux qu'un échec immédiat, vu que le
+        # résultat reste ensuite en cache pour tout le cycle de vie du process.
+        url = _HADITH_BASE_URL.format(edition=edition)
+        data = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    r = await client.get(url)
+                    r.raise_for_status()
+                    data = r.json()
+                break
+            except Exception:
+                if attempt == 2:
+                    return None
+                await asyncio.sleep(1.5 * (attempt + 1))
+
+        _hadith_cache[edition] = data
+        return data
+
+
+async def hadith_warmup():
+    """Précharge arabe + français en tâche de fond au démarrage du backend,
+    pour que le premier utilisateur à ouvrir un hadith n'attende pas ~15-30s."""
+    await asyncio.gather(_hadith_load("ar"), _hadith_load("fr"), return_exceptions=True)
+
+
+@router.get("/hadith/books")
+async def hadith_books(lang: str = Query(default="fr")):
+    """Liste des 97 livres/chapitres de Sahih al-Bukhari avec leur intervalle de hadiths."""
+    data = await _hadith_load(lang)
+    if not data:
+        raise HTTPException(502, "Source des hadiths indisponible")
+    sections = data.get("metadata", {}).get("sections", {})
+    details = data.get("metadata", {}).get("section_details", {})
+    books = []
+    for key, name in sections.items():
+        if key == "0" or not name:
+            continue
+        d = details.get(key, {})
+        first, last = d.get("hadithnumber_first"), d.get("hadithnumber_last")
+        books.append({
+            "number": int(key),
+            "name": name,
+            "hadithFirst": first,
+            "hadithLast": last,
+            "count": (last - first + 1) if (first and last) else 0,
+        })
+    books.sort(key=lambda b: b["number"])
+    return books
+
+
+@router.get("/hadith/books/{book_number}")
+async def hadith_book(book_number: int, lang: str = Query(default="fr")):
+    """Tous les hadiths d'un livre donné, texte arabe + traduction."""
+    if lang != "ar":
+        ar_data, tr_data = await asyncio.gather(_hadith_load("ar"), _hadith_load(lang))
+    else:
+        ar_data = tr_data = await _hadith_load("ar")
+    if not ar_data:
+        raise HTTPException(502, "Source des hadiths indisponible")
+
+    details = (tr_data or ar_data).get("metadata", {}).get("section_details", {})
+    d = details.get(str(book_number))
+    if not d:
+        raise HTTPException(404, "Livre invalide")
+    first, last = d.get("hadithnumber_first"), d.get("hadithnumber_last")
+    if not first or not last:
+        return {"bookNumber": book_number, "name": (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), ""), "hadiths": []}
+
+    ar_list = ar_data.get("hadiths", [])
+    tr_list = (tr_data or ar_data).get("hadiths", [])
+    hadiths = []
+    for h in ar_list:
+        n = h.get("hadithnumber")
+        if n is None or n < first or n > last:
+            continue
+        tr_h = next((x for x in tr_list if x.get("hadithnumber") == n), None)
+        hadiths.append({
+            "hadithNumber": n,
+            "textArabic": h.get("text", ""),
+            "translation": (tr_h or {}).get("text", ""),
+            "grades": (tr_h or h).get("grades", []),
+        })
+
+    name = (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), "")
+    return {"bookNumber": book_number, "name": name, "hadiths": hadiths}
+
+
+@router.get("/hadith/search")
+async def hadith_search(q: str = Query(min_length=2), lang: str = Query(default="fr")):
+    # Doit être déclaré AVANT /hadith/{hadith_number} : sinon FastAPI tente de
+    # parser "search" comme un int et renvoie 422 avant même d'atteindre cette route.
+    q = (q or "").strip().lower()
+    if len(q) < 2:
+        raise HTTPException(400, "q requis (min. 2 caractères)")
+    data = await _hadith_load(lang)
+    if not data:
+        raise HTTPException(502, "Source des hadiths indisponible")
+
+    results = []
+    for h in data.get("hadiths", []):
+        if len(results) >= 20:
+            break
+        text = h.get("text", "")
+        if q in text.lower():
+            results.append({
+                "hadithNumber": h.get("hadithnumber"),
+                "text": text[:100],
+            })
+    return {"results": results}
+
+
+@router.get("/hadith/{hadith_number}")
+async def hadith_one(hadith_number: int, lang: str = Query(default="fr")):
+    """Un hadith précis par son numéro global (1 à 7589), texte arabe + traduction."""
+    if lang != "ar":
+        ar_data, tr_data = await asyncio.gather(_hadith_load("ar"), _hadith_load(lang))
+    else:
+        ar_data = tr_data = await _hadith_load("ar")
+    if not ar_data:
+        raise HTTPException(502, "Source des hadiths indisponible")
+
+    ar_h = next((h for h in ar_data.get("hadiths", []) if h.get("hadithnumber") == hadith_number), None)
+    if not ar_h:
+        raise HTTPException(404, "Hadith introuvable")
+    tr_h = next((h for h in (tr_data or ar_data).get("hadiths", []) if h.get("hadithnumber") == hadith_number), ar_h)
+
+    book_number = ar_h.get("reference", {}).get("book")
+    book_name = (tr_data or ar_data).get("metadata", {}).get("sections", {}).get(str(book_number), "")
+    return {
+        "hadithNumber": hadith_number,
+        "textArabic": ar_h.get("text", ""),
+        "translation": tr_h.get("text", ""),
+        "grades": tr_h.get("grades", []),
+        "book": {"number": book_number, "name": book_name},
+    }
 
 
 # --------------------------------------------------------------------------- #

@@ -50,6 +50,7 @@ export async function renderHome() {
   const shortcuts = [
     { href: "#/khutbah", icon: "🎙️", titleKey: "khutbah_live", title: "Khutbah Live", subKey: "join_or_start", sub: "Rejoindre ou démarrer" },
     { href: "#/quran", icon: "📖", titleKey: "quran", title: "Coran", subKey: "read_listen", sub: "Lire et écouter" },
+    { href: "#/hadith", icon: "📜", titleKey: "hadith", title: "Hadith", subKey: "sahih_bukhari", sub: "Sahih al-Bukhari" },
     { href: "#/prayer", icon: "🕌", titleKey: "prayers", title: "Horaires de prière", subKey: "adhan_iqama", sub: "Adhan & Iqama" },
     { href: "#/announcements", icon: "📢", titleKey: "announcements", title: "Annonces", subKey: "latest_news", sub: "Dernières nouvelles" },
     { href: "#/events", icon: "📅", titleKey: "events", title: "Événements", subKey: "upcoming", sub: "À venir" },
