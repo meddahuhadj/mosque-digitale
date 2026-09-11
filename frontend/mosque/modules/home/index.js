@@ -41,6 +41,7 @@ function greetingKey(hour) {
 
 export async function renderHome() {
   if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
+  _usingMyPosition = false; // repart sur les horaires de la mosquée à chaque (re)chargement de l'accueil
 
   const userName = localStorage.getItem("userName") || "";
   const [gKey, gFallback] = greetingKey(new Date().getHours());
@@ -166,19 +167,59 @@ function renderInstallBanner() {
 }
 
 let _prayerData = null;
+let _prayerMosqueId = null;
+let _usingMyPosition = false;
 
 async function startPrayerCountdown() {
   try {
     const mosques = await api("/api/mosques", { auth: false });
-    const mosqueId = mosques?.[0]?.id;
-    if (mosqueId) {
+    _prayerMosqueId = mosques?.[0]?.id || null;
+    if (_prayerMosqueId) {
       const date = new Date().toISOString().split("T")[0];
-      _prayerData = await api(`/api/prayer-times/${mosqueId}?date=${date}`, { auth: false });
+      _prayerData = await api(`/api/prayer-times/${_prayerMosqueId}?date=${date}`, { auth: false });
     }
   } catch { _prayerData = null; }
 
   updateCountdown();
   _countdownInterval = setInterval(updateCountdown, 60000);
+}
+
+// ── « Utiliser ma position exacte » depuis l'accueil — recalcule le compte
+// à rebours sur la géolocalisation réelle plutôt que sur la mosquée par défaut ──
+function useMyPositionFromHome() {
+  const btn = document.getElementById("btn-home-my-position");
+  if (!navigator.geolocation) { toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error"); return; }
+  if (!btn) return;
+
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = "📡 " + t("locating", "Localisation...");
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      try {
+        const date = new Date().toISOString().split("T")[0];
+        _prayerData = await api(
+          `/api/prayer-times/${_prayerMosqueId || "geo"}?date=${date}&lat=${latitude}&lng=${longitude}`,
+          { auth: false }
+        );
+        _usingMyPosition = true;
+        updateCountdown();
+        toast(t("position_used", "Position exacte utilisée"), "success");
+      } catch {
+        toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    },
+    () => {
+      toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    },
+    { timeout: 10000, enableHighAccuracy: true }
+  );
 }
 
 function updateCountdown() {
@@ -246,5 +287,13 @@ function updateCountdown() {
         <div class="label">${t("at", "à")} ${nextPrayer.time} · ${timeStr}</div>
       </div>
     </div>
+    <div style="text-align:center; margin-top:6px;">
+      ${_usingMyPosition
+        ? `<span style="font-size:.8em; color:var(--accent);">📍 ${t("times_for_your_position", "Horaires calculés pour votre position exacte")}</span>`
+        : `<button class="btn btn-sm btn-secondary" id="btn-home-my-position">📍 ${t("use_my_position", "Utiliser ma position exacte")}</button>`}
+    </div>
   `;
+
+  const posBtn = document.getElementById("btn-home-my-position");
+  if (posBtn) posBtn.onclick = useMyPositionFromHome;
 }
