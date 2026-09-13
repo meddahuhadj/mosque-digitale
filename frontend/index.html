@@ -1958,7 +1958,12 @@ function prayerRenderHome(){
   const el=$("#prayerNextHome"); if(!el) return;
   const snap=prayerSnapshot(new Date());
   if(!snap){ el.textContent=t("prayer_empty"); return; }
-  el.innerHTML=t("prayer_next")+" <b>"+t("prayer_"+snap.key)+"</b> — "+t("prayer_in")+" "+_pd(snap.inSec);
+  const set=prayerSettings();
+  let locBadge = "";
+  if(set.auto) locBadge = " <span style='font-size:0.78em; opacity:0.85;' title='Position GPS réelle'>📍 GPS</span>";
+  else if(set.ipAuto) locBadge = " <span style='font-size:0.78em; opacity:0.85;' title='Position IP détectée'>📍 IP</span>";
+  else if(!set.custom && set.lat===48.856 && set.lng===2.352) locBadge = " <span style='font-size:0.78em; color:var(--warn); opacity:0.9;' title='Paris par défaut — cliquez pour utiliser votre GPS'>📍 Paris</span>";
+  el.innerHTML=t("prayer_next")+" <b>"+t("prayer_"+snap.key)+"</b> — "+t("prayer_in")+" "+_pd(snap.inSec) + locBadge;
 }
 function prayerRenderSheet(){
   const now=new Date(), snap=prayerSnapshot(now), list=$("#prayerList");
@@ -1980,32 +1985,65 @@ function prayerOpen(){
     '<option value="'+m+'"'+(m===set.method?" selected":"")+'>'+(PRAY_METHODS[m].info[uiLang]||PRAY_METHODS[m].info.fr)+'</option>').join("");
   prayerRenderSheet();
   $("#sheet-prayer").classList.remove("hidden");
-  if(!set.custom && !set.auto) prayerLocate(true);
+  if(!set.custom && !set.auto && !set.ipAuto) prayerLocate(true);
 }
 function prayerClose(){ $("#sheet-prayer").classList.add("hidden"); }
 $("#btnPrayerHome").addEventListener("click", prayerOpen);
 $("#btnClosePrayer").addEventListener("click", prayerClose);
 $("#sheet-prayer").addEventListener("click", e=>{ if(e.target===$("#sheet-prayer")) prayerClose(); });
 let prayerLocating=false;
+function prayerIPLocate(silent){
+  const g=$("#prayer-geo");
+  fetch("https://ipapi.co/json/")
+    .then(res => res.ok ? res.json() : Promise.reject())
+    .then(data => {
+      if(isFinite(+data.latitude) && isFinite(+data.longitude)){
+        const s=prayerSettings();
+        s.lat=+data.latitude.toFixed(5); s.lng=+data.longitude.toFixed(5);
+        s.ipAuto=true; delete s.custom;
+        prayerSave(s);
+        if($("#prayer-lat")) $("#prayer-lat").value=s.lat;
+        if($("#prayer-lng")) $("#prayer-lng").value=s.lng;
+        prayerRenderSheet(); prayerRenderHome();
+        const city = data.city ? (" (" + data.city + ")") : "";
+        if(g) g.textContent="📍 Position IP" + city + ": " + s.lat + ", " + s.lng;
+      } else {
+        if(g) g.textContent=t("prayer_geo_err");
+      }
+    })
+    .catch(() => {
+      if(g) g.textContent=t("prayer_geo_err");
+    });
+}
 function prayerLocate(silent){
   if(prayerLocating) return;
-  if(!navigator.geolocation){ const g=$("#prayer-geo"); if(g) g.textContent=t("prayer_geo_err"); return; }
-  prayerLocating=true;
   const g=$("#prayer-geo");
-  if(g) g.textContent=null;
+  if(g) g.textContent="📡 Localisation GPS...";
+  if(!navigator.geolocation){
+    prayerIPLocate(silent);
+    return;
+  }
+  prayerLocating=true;
   navigator.geolocation.getCurrentPosition(res=>{
     prayerLocating=false;
     const s=prayerSettings();
     s.lat=+res.coords.latitude.toFixed(5); s.lng=+res.coords.longitude.toFixed(5);
-    s.auto=true; delete s.custom;
+    s.auto=true; delete s.custom; delete s.ipAuto;
     prayerSave(s);
-    $("#prayer-lat").value=s.lat; $("#prayer-lng").value=s.lng;
+    if($("#prayer-lat")) $("#prayer-lat").value=s.lat;
+    if($("#prayer-lng")) $("#prayer-lng").value=s.lng;
     prayerRenderSheet(); prayerRenderHome();
-    if(!silent && g) g.textContent=t("prayer_geo_ok")+" ("+s.lat+", "+s.lng+")";
+    if(!silent && g) g.textContent=(t("prayer_geo_ok")||"Position exacte utilisée")+" ("+s.lat+", "+s.lng+")";
   }, err=>{
     prayerLocating=false;
-    const g2=$("#prayer-geo"); if(g2) g2.textContent=t("prayer_geo_err");
-  }, {timeout:10000, maximumAge:600000});
+    prayerIPLocate(silent);
+  }, {timeout:10000, maximumAge:600000, enableHighAccuracy:true});
+}
+function prayerInitAutoLocate(){
+  const set=prayerSettings();
+  if(!set.custom && !set.auto && !set.ipAuto){
+    prayerLocate(true);
+  }
 }
 $("#prayer-locate").addEventListener("click", ()=>prayerLocate(false));
 $("#prayer-apply").addEventListener("click", ()=>{
@@ -2014,12 +2052,13 @@ $("#prayer-apply").addEventListener("click", ()=>{
     const s=prayerSettings(); s.lat=lat; s.lng=lng;
     s.method=PRAY_METHODS[$("#prayer-method").value]?$("#prayer-method").value:"MWL";
     s.hanafi=$("#prayer-hanafi").checked;
-    s.custom=true; delete s.auto;
+    s.custom=true; delete s.auto; delete s.ipAuto;
     prayerSave(s);
   }
   prayerRenderSheet(); prayerRenderHome();
 });
 prayerRenderHome();
+prayerInitAutoLocate();
 setInterval(prayerRenderHome, 30000);
 
 /* Codes de langue -> code TTS (BCP-47 approximatif) */

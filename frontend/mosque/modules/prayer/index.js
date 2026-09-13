@@ -60,15 +60,28 @@ export async function renderPrayer(params) {
 
 async function loadForMosque(mosqueId, date) {
   let data;
+  let saved = null;
   try {
-    data = mosqueId
-      ? await api(`/api/prayer-times/${mosqueId}?date=${date}`, { auth: false })
-      : getBrowserPrayerTimes();
+    const raw = localStorage.getItem("userGeo") || localStorage.getItem("prayerSet");
+    if (raw) saved = JSON.parse(raw);
+  } catch {}
+
+  try {
+    if (saved && saved.lat && saved.lng) {
+      data = await api(`/api/prayer-times/${mosqueId || "geo"}?date=${date}&lat=${saved.lat}&lng=${saved.lng}`, { auth: false });
+      setSourceNote("📍 " + t("times_for_your_position", "Horaires calculés pour votre position exacte") +
+        ` (${(+saved.lat).toFixed(3)}, ${(+saved.lng).toFixed(3)})`);
+    } else {
+      data = mosqueId
+        ? await api(`/api/prayer-times/${mosqueId}?date=${date}`, { auth: false })
+        : getBrowserPrayerTimes();
+      setSourceNote(null);
+    }
   } catch {
     data = getBrowserPrayerTimes();
+    setSourceNote(null);
   }
   renderPrayerTimes(data);
-  setSourceNote(null);
 }
 
 function setSourceNote(text) {
@@ -81,38 +94,65 @@ function setSourceNote(text) {
 
 function useMyPosition(mosqueId, date) {
   const btn = document.getElementById("btn-use-my-position");
-  if (!navigator.geolocation) { toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error"); return; }
-
   btn.disabled = true;
   const originalLabel = btn.textContent;
   btn.textContent = "📡 " + t("locating", "Localisation...");
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const { latitude, longitude } = pos.coords;
-      try {
-        const data = await api(
-          `/api/prayer-times/${mosqueId || "geo"}?date=${date}&lat=${latitude}&lng=${longitude}`,
-          { auth: false }
-        );
-        renderPrayerTimes(data);
-        setSourceNote("📍 " + t("times_for_your_position", "Horaires calculés pour votre position exacte") +
-          ` (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`);
-        toast(t("position_used", "Position exacte utilisée"), "success");
-      } catch {
-        toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
-      }
-    },
-    () => {
+  const applyGeoData = async (latitude, longitude, sourceLabel = "") => {
+    try {
+      localStorage.setItem("userGeo", JSON.stringify({ lat: latitude, lng: longitude }));
+      const data = await api(
+        `/api/prayer-times/${mosqueId || "geo"}?date=${date}&lat=${latitude}&lng=${longitude}`,
+        { auth: false }
+      );
+      renderPrayerTimes(data);
+      setSourceNote("📍 " + t("times_for_your_position", "Horaires calculés pour votre position exacte") +
+        (sourceLabel ? ` ${sourceLabel}` : "") + ` (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`);
+      toast(t("position_used", "Position exacte utilisée"), "success");
+    } catch {
+      toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  };
+
+  if (!navigator.geolocation) {
+    tryIPGeo(applyGeoData, () => {
       toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
       btn.disabled = false;
       btn.textContent = originalLabel;
+    });
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      applyGeoData(pos.coords.latitude, pos.coords.longitude);
+    },
+    () => {
+      tryIPGeo(applyGeoData, () => {
+        toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      });
     },
     { timeout: 10000, enableHighAccuracy: true }
   );
+}
+
+function tryIPGeo(onSuccess, onError) {
+  fetch("https://ipapi.co/json/")
+    .then((res) => (res.ok ? res.json() : Promise.reject()))
+    .then((data) => {
+      if (isFinite(+data.latitude) && isFinite(+data.longitude)) {
+        const city = data.city ? `(${data.city})` : "";
+        onSuccess(+data.latitude, +data.longitude, `[IP ${city}]`);
+      } else {
+        onError();
+      }
+    })
+    .catch(onError);
 }
 
 // ── Localisation de la mosquée : itinéraire + distance (géolocalisation navigateur) ──

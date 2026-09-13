@@ -18,8 +18,11 @@ router.get("/:mosqueId", async (req, res, next) => {
   try {
     const mosqueId = req.params.mosqueId as string;
     const date = (req.query.date as string) || new Date().toISOString().split("T")[0];
+    const lat = req.query.lat as string | undefined;
+    const lng = req.query.lng as string | undefined;
+    const method = req.query.method as string | undefined;
 
-    const times = await getOrCalculatePrayerTimes(mosqueId, date);
+    const times = await getOrCalculatePrayerTimes(mosqueId, date, lat, lng, method);
     if (!times) return res.status(404).json({ error: "Cannot determine prayer times (missing coordinates)" });
 
     res.json(times);

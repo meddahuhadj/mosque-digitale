@@ -88,7 +88,33 @@ export function getNextPrayer(lat: string, lng: string, method?: string): { name
   return null;
 }
 
-export async function getOrCalculatePrayerTimes(mosqueId: string, date: string): Promise<any> {
+export async function getOrCalculatePrayerTimes(
+  mosqueId: string,
+  date: string,
+  lat?: string,
+  lng?: string,
+  method?: string
+): Promise<any> {
+  if (lat && lng) {
+    return {
+      ...calculatePrayerTimes(lat, lng, new Date(date), method || "MuslimWorldLeague"),
+      source: "geo",
+      lat: parseFloat(lat),
+      lng: parseFloat(lng),
+    };
+  }
+
+  if (mosqueId === "geo") {
+    const defaultLat = "48.8566";
+    const defaultLng = "2.3522";
+    return {
+      ...calculatePrayerTimes(defaultLat, defaultLng, new Date(date), method || "MuslimWorldLeague"),
+      source: "default",
+      lat: parseFloat(defaultLat),
+      lng: parseFloat(defaultLng),
+    };
+  }
+
   // Try to get from DB first
   const [stored] = await db
     .select()

@@ -173,10 +173,23 @@ let _usingMyPosition = false;
 
 async function startPrayerCountdown() {
   try {
+    const date = new Date().toISOString().split("T")[0];
+    let saved = null;
+    try {
+      const raw = localStorage.getItem("userGeo") || localStorage.getItem("prayerSet");
+      if (raw) saved = JSON.parse(raw);
+    } catch {}
+
     const mosques = await api("/api/mosques", { auth: false });
     _prayerMosqueId = mosques?.[0]?.id || null;
-    if (_prayerMosqueId) {
-      const date = new Date().toISOString().split("T")[0];
+
+    if (saved && saved.lat && saved.lng) {
+      _prayerData = await api(
+        `/api/prayer-times/${_prayerMosqueId || "geo"}?date=${date}&lat=${saved.lat}&lng=${saved.lng}`,
+        { auth: false }
+      );
+      _usingMyPosition = true;
+    } else if (_prayerMosqueId) {
       _prayerData = await api(`/api/prayer-times/${_prayerMosqueId}?date=${date}`, { auth: false });
     }
   } catch { _prayerData = null; }
@@ -189,35 +202,60 @@ async function startPrayerCountdown() {
 // à rebours sur la géolocalisation réelle plutôt que sur la mosquée par défaut ──
 function useMyPositionFromHome() {
   const btn = document.getElementById("btn-home-my-position");
-  if (!navigator.geolocation) { toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error"); return; }
   if (!btn) return;
 
   btn.disabled = true;
   const originalLabel = btn.textContent;
   btn.textContent = "📡 " + t("locating", "Localisation...");
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const { latitude, longitude } = pos.coords;
-      try {
-        const date = new Date().toISOString().split("T")[0];
-        _prayerData = await api(
-          `/api/prayer-times/${_prayerMosqueId || "geo"}?date=${date}&lat=${latitude}&lng=${longitude}`,
-          { auth: false }
-        );
-        _usingMyPosition = true;
-        updateCountdown();
-        toast(t("position_used", "Position exacte utilisée"), "success");
-      } catch {
-        toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
-        btn.disabled = false;
-        btn.textContent = originalLabel;
-      }
-    },
-    () => {
+  const applyPos = async (latitude, longitude) => {
+    try {
+      const date = new Date().toISOString().split("T")[0];
+      localStorage.setItem("userGeo", JSON.stringify({ lat: latitude, lng: longitude }));
+      _prayerData = await api(
+        `/api/prayer-times/${_prayerMosqueId || "geo"}?date=${date}&lat=${latitude}&lng=${longitude}`,
+        { auth: false }
+      );
+      _usingMyPosition = true;
+      updateCountdown();
+      toast(t("position_used", "Position exacte utilisée"), "success");
+    } catch {
       toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
       btn.disabled = false;
       btn.textContent = originalLabel;
+    }
+  };
+
+  const tryIP = () => {
+    fetch("https://ipapi.co/json/")
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => {
+        if (isFinite(+data.latitude) && isFinite(+data.longitude)) {
+          applyPos(+data.latitude, +data.longitude);
+        } else {
+          toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }
+      })
+      .catch(() => {
+        toast(t("geolocation_unavailable", "Géolocalisation non disponible"), "error");
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      });
+  };
+
+  if (!navigator.geolocation) {
+    tryIP();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      applyPos(pos.coords.latitude, pos.coords.longitude);
+    },
+    () => {
+      tryIP();
     },
     { timeout: 10000, enableHighAccuracy: true }
   );
